@@ -52,6 +52,17 @@ app.use(express.urlencoded({ extended: true }));
 // Serve generated invoices statically (local dev only — not persistent on Vercel)
 app.use('/invoices', express.static(path.join(__dirname, 'invoices')));
 
+// Ensure MongoDB is connected before handling API requests
+app.use(async (req, res, next) => {
+  try {
+    await connectDB();
+    next();
+  } catch (err) {
+    console.error('Database connection error:', err.message);
+    res.status(500).json({ success: false, message: 'Database connection failed: ' + err.message });
+  }
+});
+
 // API Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/dashboard', dashboardRoutes);
