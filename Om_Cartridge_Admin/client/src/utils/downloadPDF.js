@@ -1,9 +1,9 @@
 /**
- * Download a PDF invoice using Axios (bypasses browser popup blockers)
- * Uses the public PDF endpoint — no auth header needed
+ * Download a PDF invoice using fetch
+ * Uses the public PDF endpoint /api/invoices/:id/pdf
  */
 export const downloadInvoicePDF = async (invoiceId, invoiceNumber) => {
-  const url = `${import.meta.env.VITE_API_URL?.replace('/api', '') || 'http://localhost:5001'}/api/invoices/${invoiceId}/pdf`;
+  const url = `/api/invoices/${invoiceId}/pdf`;
 
   const response = await fetch(url);
   if (!response.ok) {
