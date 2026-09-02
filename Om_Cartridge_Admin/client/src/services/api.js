@@ -23,7 +23,7 @@ api.interceptors.request.use(
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.response?.status === 401) {
+    if (error.response?.status === 401 && !window.location.pathname.startsWith('/login')) {
       localStorage.removeItem('om_token');
       localStorage.removeItem('om_user');
       window.location.href = '/login';
