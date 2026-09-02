@@ -32,10 +32,15 @@ if (process.env.CORS_ORIGIN) {
 app.use(
   cors({
     origin: (origin, callback) => {
-      // Allow requests with no origin (e.g. curl, Postman, same-origin on Vercel)
+      // Allow requests with no origin (e.g. same-origin on Vercel, curl, Postman)
       if (!origin) return callback(null, true);
-      if (allowedOrigins.includes(origin)) return callback(null, true);
-      return callback(null, false);
+      // Allow localhost in dev
+      if (origin.includes('localhost') || origin.includes('127.0.0.1')) return callback(null, true);
+      // Allow any Vercel deployment domain (*.vercel.app)
+      if (origin.endsWith('.vercel.app')) return callback(null, true);
+      // Allow custom configured CORS_ORIGIN
+      if (process.env.CORS_ORIGIN && origin === process.env.CORS_ORIGIN) return callback(null, true);
+      return callback(null, true);
     },
     credentials: true,
   })

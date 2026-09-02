@@ -33,7 +33,7 @@ const LoginPage = () => {
       toast.success('Welcome back!');
       navigate('/dashboard');
     } catch (err) {
-      const msg = err.response?.data?.message || 'Invalid credentials';
+      const msg = err.response?.data?.message || err.message || 'Login failed. Please check connection.';
       toast.error(msg);
       setErrors({ general: msg });
     } finally {
