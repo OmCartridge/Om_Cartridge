@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react';
-import { Plus, Search, Edit2, Trash2, TrendingUp, TrendingDown, BarChart3, X } from 'lucide-react';
+import { Plus, Search, Edit2, Trash2, TrendingUp, BarChart3, X, Upload } from 'lucide-react';
 import AppLayout from '../layouts/AppLayout';
 import api from '../services/api';
 import toast from 'react-hot-toast';
+import ConfirmModal from '../components/ConfirmModal';
+import CSVImportModal from '../components/CSVImportModal';
 
 const GST_RATES = [0, 5, 12, 18, 28];
 const UNITS = ['PCS', 'BOX', 'PACK', 'SET', 'ROLL', 'KG', 'LTR', 'MTR'];
@@ -14,7 +16,10 @@ const StockStatusBadge = ({ qty, minStock }) => {
   return <span className="badge badge-success">In Stock</span>;
 };
 
-const defaultProduct = { name: '', sku: '', hsnSac: '', description: '', quantity: 0, unit: 'PCS', purchaseRate: 0, sellingRate: 0, gstRate: 18, minimumStock: 5, isActive: true };
+const defaultProduct = {
+  name: '', sku: '', hsnSac: '', description: '', quantity: 0, unit: 'PCS',
+  purchaseRate: 0, sellingRate: 0, gstRate: 18, minimumStock: 5, isActive: true,
+};
 
 const StockPage = () => {
   const [products, setProducts] = useState([]);
@@ -27,15 +32,19 @@ const StockPage = () => {
   const [adjustForm, setAdjustForm] = useState({ productId: '', adjustment: '', reason: 'New Purchase' });
   const [saving, setSaving] = useState(false);
 
+  // Confirm delete modal
+  const [confirmDelete, setConfirmDelete] = useState(null);
+  const [deleting, setDeleting] = useState(false);
+
+  // CSV import
+  const [showCSV, setShowCSV] = useState(false);
+
   const fetchProducts = async () => {
     try {
       const res = await api.get('/products', { params: { search } });
       setProducts(res.data.data);
-    } catch {
-      toast.error('Failed to load products');
-    } finally {
-      setLoading(false);
-    }
+    } catch { toast.error('Failed to load products'); }
+    finally { setLoading(false); }
   };
 
   useEffect(() => { fetchProducts(); }, [search]);
@@ -61,25 +70,25 @@ const StockPage = () => {
       fetchProducts();
     } catch (err) {
       toast.error(err.response?.data?.message || 'Failed to save product');
-    } finally {
-      setSaving(false);
-    }
+    } finally { setSaving(false); }
   };
 
-  const handleDelete = async (p) => {
-    if (!window.confirm(`Delete "${p.name}"? This action cannot be undone.`)) return;
+  const handleDelete = async () => {
+    if (!confirmDelete) return;
+    setDeleting(true);
     try {
-      await api.delete(`/products/${p._id}`);
+      await api.delete(`/products/${confirmDelete._id}`);
       toast.success('Product deleted');
+      setConfirmDelete(null);
       fetchProducts();
     } catch (err) {
-      toast.error(err.response?.data?.message || 'Failed to delete');
-    }
+      toast.error(err.response?.data?.message || 'Failed to delete product');
+    } finally { setDeleting(false); }
   };
 
   const handleAdjust = async (e) => {
     e.preventDefault();
-    if (!adjustForm.adjustment || adjustForm.adjustment === '0') { toast.error('Enter a valid adjustment'); return; }
+    if (!adjustForm.adjustment || adjustForm.adjustment === '0') { toast.error('Enter a valid adjustment quantity'); return; }
     setSaving(true);
     try {
       await api.post('/stock/adjust', {
@@ -92,12 +101,8 @@ const StockPage = () => {
       fetchProducts();
     } catch (err) {
       toast.error(err.response?.data?.message || 'Adjustment failed');
-    } finally {
-      setSaving(false);
-    }
+    } finally { setSaving(false); }
   };
-
-  const f = (v) => form[v] || '';
 
   return (
     <AppLayout title="Stock Management">
@@ -106,9 +111,14 @@ const StockPage = () => {
           <h1>Stock Management</h1>
           <p>Manage your product inventory</p>
         </div>
-        <button className="btn btn-primary" id="add-product-btn" onClick={openAdd}>
-          <Plus size={16} /> Add Product
-        </button>
+        <div style={{ display: 'flex', gap: '10px' }}>
+          <button className="btn btn-outline" onClick={() => setShowCSV(true)} style={{ gap: '6px' }}>
+            <Upload size={15} /> Import CSV
+          </button>
+          <button className="btn btn-primary" id="add-product-btn" onClick={openAdd}>
+            <Plus size={16} /> Add Product
+          </button>
+        </div>
       </div>
 
       <div className="card">
@@ -172,7 +182,7 @@ const StockPage = () => {
                       <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
                         <button className="btn btn-outline btn-sm btn-icon" title="Adjust Stock" onClick={() => openAdjust(p)}><TrendingUp size={14} /></button>
                         <button className="btn btn-outline btn-sm btn-icon" title="Edit" onClick={() => openEdit(p)}><Edit2 size={14} /></button>
-                        <button className="btn btn-danger btn-sm btn-icon" title="Delete" onClick={() => handleDelete(p)}><Trash2 size={14} /></button>
+                        <button className="btn btn-danger btn-sm btn-icon" title="Delete" onClick={() => setConfirmDelete(p)}><Trash2 size={14} /></button>
                       </div>
                     </td>
                   </tr>
@@ -183,7 +193,7 @@ const StockPage = () => {
         </div>
       </div>
 
-      {/* Product Modal */}
+      {/* Product Add/Edit Modal */}
       {showProductModal && (
         <div className="modal-overlay">
           <div className="modal modal-lg">
@@ -196,11 +206,11 @@ const StockPage = () => {
                 <div className="form-grid">
                   <div className="form-group">
                     <label className="form-label">Product Name <span className="required">*</span></label>
-                    <input id="prod-name" className="form-control" value={form.name} onChange={e => setForm({...form, name: e.target.value})} placeholder="e.g. HP 337 Toner Cartridge" />
+                    <input id="prod-name" className="form-control" value={form.name} onChange={e => setForm({...form, name: e.target.value})} placeholder="Example Product Name" />
                   </div>
                   <div className="form-group">
                     <label className="form-label">SKU / Product Code <span className="required">*</span></label>
-                    <input id="prod-sku" className="form-control" value={form.sku} onChange={e => setForm({...form, sku: e.target.value})} placeholder="e.g. OC-337-283A" />
+                    <input id="prod-sku" className="form-control" value={form.sku} onChange={e => setForm({...form, sku: e.target.value.toUpperCase()})} placeholder="e.g. PROD-001" />
                   </div>
                 </div>
                 <div className="form-grid">
@@ -217,7 +227,7 @@ const StockPage = () => {
                 </div>
                 <div className="form-group">
                   <label className="form-label">Description</label>
-                  <input className="form-control" value={form.description} onChange={e => setForm({...form, description: e.target.value})} />
+                  <input className="form-control" value={form.description} onChange={e => setForm({...form, description: e.target.value})} placeholder="Brief product description" />
                 </div>
                 <div className="form-grid-3">
                   <div className="form-group">
@@ -261,7 +271,7 @@ const StockPage = () => {
         </div>
       )}
 
-      {/* Stock Adjust Modal */}
+      {/* Adjust Stock Modal */}
       {showAdjustModal && (
         <div className="modal-overlay">
           <div className="modal">
@@ -281,7 +291,7 @@ const StockPage = () => {
                     onChange={e => setAdjustForm({...adjustForm, adjustment: e.target.value})}
                   />
                   <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '4px' }}>
-                    Use positive (+10) for stock in, negative (-5) for stock out
+                    Use positive (+10) to add stock, negative (-5) to remove
                   </div>
                 </div>
                 <div className="form-group">
@@ -299,6 +309,28 @@ const StockPage = () => {
           </div>
         </div>
       )}
+
+      {/* Delete Confirmation Modal */}
+      <ConfirmModal
+        isOpen={!!confirmDelete}
+        variant="danger"
+        title="Delete Product?"
+        message={confirmDelete ? `Are you sure you want to delete "${confirmDelete.name}" (SKU: ${confirmDelete.sku})? This cannot be undone.` : ''}
+        warning="Products used in invoices cannot be deleted without removing the invoices first."
+        confirmText="Delete Product"
+        cancelText="Cancel"
+        loading={deleting}
+        onConfirm={handleDelete}
+        onCancel={() => setConfirmDelete(null)}
+      />
+
+      {/* CSV Import Modal */}
+      <CSVImportModal
+        isOpen={showCSV}
+        onClose={() => setShowCSV(false)}
+        type="products"
+        onImportComplete={fetchProducts}
+      />
     </AppLayout>
   );
 };

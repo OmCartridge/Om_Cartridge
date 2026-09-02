@@ -89,31 +89,70 @@ function roundTo2(num) {
 }
 
 /**
- * Calculate invoice totals
- * isInterState: if true, use IGST; else use CGST + SGST
+ * Calculate per-item discount amount
+ * discountType: 'none' | 'percent' | 'fixed'
  */
-function calculateInvoiceTotals(items, isInterState = false) {
-  let subtotal = 0;
-  const processedItems = items.map((item) => {
-    const amount = roundTo2(item.quantity * item.rate);
-    const gstRate = item.gstRate || 18;
+function computeItemDiscount(amount, discountType, discountValue) {
+  if (!discountType || discountType === 'none' || !discountValue) return 0;
+  if (discountType === 'percent') {
+    return roundTo2(amount * (Number(discountValue) / 100));
+  }
+  if (discountType === 'fixed') {
+    // Cannot exceed the amount
+    return roundTo2(Math.min(Number(discountValue), amount));
+  }
+  return 0;
+}
 
+/**
+ * Calculate invoice totals with optional per-item discount support and tax mode.
+ * isInterState: if true, use IGST; else use CGST + SGST
+ * taxMode: 'with_tax' | 'without_tax' — when without_tax, all GST = 0
+ *
+ * Each item may have:
+ *   discountType: 'none' | 'percent' | 'fixed'
+ *   discountValue: number
+ */
+function calculateInvoiceTotals(items, isInterState = false, taxMode = 'with_tax') {
+  const applyTax = taxMode !== 'without_tax';
+  let subtotal = 0;
+  let totalDiscount = 0;
+
+  const processedItems = items.map((item) => {
+    const qty = Number(item.quantity) || 0;
+    const rate = Number(item.rate) || 0;
+    const amount = roundTo2(qty * rate);
+    const gstRate = item.gstRate !== undefined ? Number(item.gstRate) : 18;
+
+    const discountType = item.discountType || 'none';
+    const discountValue = Number(item.discountValue) || 0;
+    const discountAmount = computeItemDiscount(amount, discountType, discountValue);
+    const finalAmount = roundTo2(amount - discountAmount);
+
+    // Tax only applied when taxMode === 'with_tax'
     let cgstAmount = 0;
     let sgstAmount = 0;
     let igstAmount = 0;
 
-    if (isInterState) {
-      igstAmount = roundTo2(amount * (gstRate / 100));
-    } else {
-      cgstAmount = roundTo2(amount * (gstRate / 2 / 100));
-      sgstAmount = roundTo2(amount * (gstRate / 2 / 100));
+    if (applyTax) {
+      if (isInterState) {
+        igstAmount = roundTo2(finalAmount * (gstRate / 100));
+      } else {
+        cgstAmount = roundTo2(finalAmount * (gstRate / 2 / 100));
+        sgstAmount = roundTo2(finalAmount * (gstRate / 2 / 100));
+      }
     }
 
     subtotal += amount;
+    totalDiscount += discountAmount;
 
     return {
       ...item,
       amount,
+      discountType,
+      discountValue,
+      discountAmount,
+      finalAmount,
       cgstAmount,
       sgstAmount,
       igstAmount,
@@ -121,7 +160,8 @@ function calculateInvoiceTotals(items, isInterState = false) {
   });
 
   subtotal = roundTo2(subtotal);
-  const taxableValue = subtotal;
+  totalDiscount = roundTo2(totalDiscount);
+  const taxableValue = roundTo2(subtotal - totalDiscount);
 
   let cgst = 0;
   let sgst = 0;
@@ -136,7 +176,7 @@ function calculateInvoiceTotals(items, isInterState = false) {
   cgst = roundTo2(cgst);
   sgst = roundTo2(sgst);
   igst = roundTo2(igst);
-  const totalTax = roundTo2(cgst + sgst + igst);
+  const totalTax = roundTo2(cgst + sgst + igst); // 0 when without_tax
 
   const rawTotal = roundTo2(taxableValue + totalTax);
   const grandTotal = Math.round(rawTotal);
@@ -148,6 +188,7 @@ function calculateInvoiceTotals(items, isInterState = false) {
   return {
     items: processedItems,
     subtotal,
+    totalDiscount,
     taxableValue,
     cgst,
     sgst,
@@ -161,9 +202,46 @@ function calculateInvoiceTotals(items, isInterState = false) {
   };
 }
 
+/**
+ * Simple CSV parser — handles quoted fields and commas within quotes
+ */
+function parseCSVLine(line) {
+  const result = [];
+  let cur = '';
+  let inQuotes = false;
+  for (let i = 0; i < line.length; i++) {
+    const ch = line[i];
+    if (ch === '"') {
+      if (inQuotes && line[i + 1] === '"') { cur += '"'; i++; }
+      else { inQuotes = !inQuotes; }
+    } else if (ch === ',' && !inQuotes) {
+      result.push(cur.trim());
+      cur = '';
+    } else {
+      cur += ch;
+    }
+  }
+  result.push(cur.trim());
+  return result;
+}
+
+function parseCSV(text) {
+  const lines = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n').trim().split('\n');
+  if (lines.length < 1) return { headers: [], rows: [] };
+  const headers = parseCSVLine(lines[0]).map(h => h.replace(/^"|"$/g, '').toLowerCase().trim());
+  const rows = lines.slice(1).filter(l => l.trim()).map((line, idx) => {
+    const values = parseCSVLine(line);
+    const obj = { _rowNumber: idx + 2 }; // 1-indexed, +1 for header row
+    headers.forEach((h, i) => { obj[h] = (values[i] || '').replace(/^"|"$/g, '').trim(); });
+    return obj;
+  });
+  return { headers, rows };
+}
+
 module.exports = {
   numberToWordsIndian,
   getFinancialYear,
   roundTo2,
   calculateInvoiceTotals,
+  parseCSV,
 };

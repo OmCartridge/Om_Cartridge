@@ -3,8 +3,6 @@ const Product = require('../models/Product');
 const Customer = require('../models/Customer');
 const StockMovement = require('../models/StockMovement');
 const Settings = require('../models/Settings');
-const path = require('path');
-const fs = require('fs');
 const { calculateInvoiceTotals, getFinancialYear } = require('../utils/invoiceUtils');
 const { generateInvoicePDF } = require('../services/pdfService');
 const { sendInvoiceEmail } = require('../services/emailService');
@@ -92,10 +90,14 @@ const createInvoice = async (req, res, next) => {
   try {
     const {
       customerId, invoiceDate, items, isInterState,
+      taxMode,
       paymentTerms, referenceNumber, buyersOrderNumber,
       deliveryNote, dispatchDetails, destination, termsOfDelivery,
       sendEmail,
     } = req.body;
+
+    // Validate taxMode
+    const resolvedTaxMode = taxMode === 'without_tax' ? 'without_tax' : 'with_tax';
 
     // --- Basic validation ---
     if (!customerId) return res.status(400).json({ success: false, message: 'Customer is required' });
@@ -143,6 +145,9 @@ const createInvoice = async (req, res, next) => {
           unit: item.unit || product.unit || 'PCS',
           rate: Number(item.rate),
           gstRate: item.gstRate !== undefined ? Number(item.gstRate) : product.gstRate,
+          // Discount fields
+          discountType: item.discountType || 'none',
+          discountValue: Number(item.discountValue) || 0,
         },
       });
     }
@@ -150,7 +155,8 @@ const createInvoice = async (req, res, next) => {
     // --- Calculate totals on backend ---
     const calculated = calculateInvoiceTotals(
       processedItems.map((p) => p.itemData),
-      !!isInterState
+      !!isInterState,
+      resolvedTaxMode
     );
 
     // --- Generate invoice number ---
@@ -201,6 +207,7 @@ const createInvoice = async (req, res, next) => {
         },
         items: calculated.items,
         subtotal: calculated.subtotal,
+        totalDiscount: calculated.totalDiscount || 0,
         taxableValue: calculated.taxableValue,
         cgst: calculated.cgst,
         sgst: calculated.sgst,
@@ -211,6 +218,7 @@ const createInvoice = async (req, res, next) => {
         amountInWords: calculated.amountInWords,
         taxAmountInWords: calculated.taxAmountInWords,
         isInterState: !!isInterState,
+        taxMode: resolvedTaxMode,
         paymentTerms: paymentTerms || invoiceSettings.defaultPaymentTerms || '',
         referenceNumber: referenceNumber || '',
         buyersOrderNumber: buyersOrderNumber || '',
@@ -255,12 +263,10 @@ const createInvoice = async (req, res, next) => {
       }).catch((err) => console.error('StockMovement create error:', err.message));
     }
 
-    // --- Generate PDF ---
-    let pdfPath = '';
+    // --- Generate PDF buffer (in-memory, no disk write) ---
+    let pdfBuffer = null;
     try {
-      const { filepath } = await generateInvoicePDF(invoice.toObject());
-      pdfPath = filepath;
-      await Invoice.findByIdAndUpdate(invoice._id, { pdfPath });
+      pdfBuffer = await generateInvoicePDF(invoice.toObject());
     } catch (pdfError) {
       console.error('PDF generation failed:', pdfError.message);
     }
@@ -278,8 +284,8 @@ const createInvoice = async (req, res, next) => {
           from: smtp.from || process.env.SMTP_FROM || '',
         };
 
-        if (pdfPath && fs.existsSync(pdfPath)) {
-          await sendInvoiceEmail({ invoice: invoice.toObject(), pdfPath, smtpConfig });
+        if (pdfBuffer) {
+          await sendInvoiceEmail({ invoice: invoice.toObject(), pdfBuffer, smtpConfig });
           emailStatus = 'SENT';
         } else {
           emailStatus = 'FAILED';
@@ -366,41 +372,21 @@ const downloadInvoicePDF = async (req, res, next) => {
     const invoice = await Invoice.findById(req.params.id).lean();
     if (!invoice) return res.status(404).json({ success: false, message: 'Invoice not found' });
 
-    let pdfPath = invoice.pdfPath;
-
-    // Regenerate if file doesn't exist or path is empty
-    if (!pdfPath || !fs.existsSync(pdfPath)) {
-      try {
-        const result = await generateInvoicePDF(invoice);
-        pdfPath = result.filepath;
-        await Invoice.findByIdAndUpdate(invoice._id, { pdfPath });
-      } catch (err) {
-        console.error('PDF generation error:', err.message);
-        return res
-          .status(500)
-          .json({ success: false, message: 'PDF generation failed: ' + err.message });
-      }
-    }
-
-    // Ensure absolute path (required by Express on Windows)
-    const absolutePath = path.resolve(pdfPath);
-
-    if (!fs.existsSync(absolutePath)) {
-      return res.status(404).json({ success: false, message: 'PDF file not found on disk' });
+    let pdfBuffer;
+    try {
+      pdfBuffer = await generateInvoicePDF(invoice);
+    } catch (err) {
+      console.error('PDF generation error:', err.message);
+      return res
+        .status(500)
+        .json({ success: false, message: 'PDF generation failed: ' + err.message });
     }
 
     const safeName = (invoice.invoiceNumber || 'invoice').replace(/[\/\\:*?"<>|]/g, '-');
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `attachment; filename="OM-INV-${safeName}.pdf"`);
-
-    res.sendFile(absolutePath, (err) => {
-      if (err) {
-        console.error('sendFile error:', err.message);
-        if (!res.headersSent) {
-          res.status(500).json({ success: false, message: 'Failed to send PDF file' });
-        }
-      }
-    });
+    res.setHeader('Content-Length', pdfBuffer.length);
+    res.send(pdfBuffer);
   } catch (error) {
     next(error);
   }
@@ -417,12 +403,7 @@ const emailInvoice = async (req, res, next) => {
     if (!customerEmail)
       return res.status(400).json({ success: false, message: 'Customer email not available' });
 
-    let pdfPath = invoice.pdfPath;
-    if (!pdfPath || !fs.existsSync(pdfPath)) {
-      const result = await generateInvoicePDF(invoice);
-      pdfPath = result.filepath;
-      await Invoice.findByIdAndUpdate(invoice._id, { pdfPath });
-    }
+    const pdfBuffer = await generateInvoicePDF(invoice);
 
     const settings = await Settings.findOne({});
     const smtp = settings?.smtp || {};
@@ -434,7 +415,7 @@ const emailInvoice = async (req, res, next) => {
       from: smtp.from || process.env.SMTP_FROM || '',
     };
 
-    await sendInvoiceEmail({ invoice, pdfPath, smtpConfig });
+    await sendInvoiceEmail({ invoice, pdfBuffer, smtpConfig });
     await Invoice.findByIdAndUpdate(invoice._id, { emailStatus: 'SENT', emailSentAt: new Date() });
 
     res.json({ success: true, message: 'Invoice emailed successfully' });

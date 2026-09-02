@@ -1,9 +1,11 @@
+import { useState } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import {
-  LayoutDashboard, Package, Users, FileText, PlusCircle, Settings, LogOut, ChevronRight
+  LayoutDashboard, Package, Users, FileText, PlusCircle, Settings, LogOut
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import OMLogo from '../components/OMLogo';
+import ConfirmModal from '../components/ConfirmModal';
 import toast from 'react-hot-toast';
 
 const navItems = [
@@ -18,12 +20,19 @@ const navItems = [
 const AppLayout = ({ children, title }) => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+  const [loggingOut, setLoggingOut] = useState(false);
 
   const handleLogout = async () => {
-    if (!window.confirm('Are you sure you want to logout?')) return;
-    await logout();
-    toast.success('Logged out successfully');
-    navigate('/login');
+    setLoggingOut(true);
+    try {
+      await logout();
+      toast.success('Logged out successfully');
+      navigate('/login');
+    } finally {
+      setLoggingOut(false);
+      setShowLogoutConfirm(false);
+    }
   };
 
   return (
@@ -49,7 +58,11 @@ const AppLayout = ({ children, title }) => {
         </nav>
 
         <div className="sidebar-footer">
-          <button className="nav-item" onClick={handleLogout} style={{ width: '100%', background: 'none', border: 'none', textAlign: 'left' }}>
+          <button
+            className="nav-item"
+            onClick={() => setShowLogoutConfirm(true)}
+            style={{ width: '100%', background: 'none', border: 'none', textAlign: 'left' }}
+          >
             <LogOut size={18} />
             <span>Logout</span>
           </button>
@@ -74,6 +87,19 @@ const AppLayout = ({ children, title }) => {
           {children}
         </main>
       </div>
+
+      {/* Logout Confirmation Modal */}
+      <ConfirmModal
+        isOpen={showLogoutConfirm}
+        variant="warning"
+        title="Logout?"
+        message="Are you sure you want to log out of the system?"
+        confirmText="Logout"
+        cancelText="Stay"
+        loading={loggingOut}
+        onConfirm={handleLogout}
+        onCancel={() => setShowLogoutConfirm(false)}
+      />
     </div>
   );
 };

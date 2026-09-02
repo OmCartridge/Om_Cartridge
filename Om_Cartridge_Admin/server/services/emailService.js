@@ -1,10 +1,9 @@
 const nodemailer = require('nodemailer');
-const fs = require('fs');
 
 /**
  * Send invoice email with PDF attachment
  */
-async function sendInvoiceEmail({ invoice, pdfPath, smtpConfig }) {
+async function sendInvoiceEmail({ invoice, pdfBuffer, smtpConfig }) {
   const { host, port, user, password, from } = smtpConfig;
 
   if (!host || !user || !password) {
@@ -78,7 +77,7 @@ async function sendInvoiceEmail({ invoice, pdfPath, smtpConfig }) {
     attachments: [
       {
         filename: `${invoice.invoiceNumber}.pdf`,
-        path: pdfPath,
+        content: pdfBuffer,
         contentType: 'application/pdf',
       },
     ],

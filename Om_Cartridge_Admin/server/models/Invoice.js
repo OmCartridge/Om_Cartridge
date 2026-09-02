@@ -6,8 +6,14 @@ const invoiceItemSchema = new mongoose.Schema({
   hsnSac: { type: String, default: '' },
   quantity: { type: Number, required: true, min: 0.01 },
   unit: { type: String, default: 'PCS' },
-  rate: { type: Number, required: true, min: 0 },
-  amount: { type: Number, required: true },
+  rate: { type: Number, required: true, min: 0 },         // original rate from product
+  amount: { type: Number, required: true },               // qty × rate (before discount)
+  // Discount support
+  discountType: { type: String, enum: ['none', 'percent', 'fixed'], default: 'none' },
+  discountValue: { type: Number, default: 0 },            // % value or fixed rupee amount
+  discountAmount: { type: Number, default: 0 },           // computed discount rupee amount
+  finalAmount: { type: Number, required: true },          // amount - discountAmount (taxable base)
+  // GST
   gstRate: { type: Number, default: 18 },
   cgstAmount: { type: Number, default: 0 },
   sgstAmount: { type: Number, default: 0 },
@@ -53,8 +59,9 @@ const invoiceSchema = new mongoose.Schema(
 
     items: [invoiceItemSchema],
 
-    subtotal: { type: Number, required: true },
-    taxableValue: { type: Number, required: true },
+    subtotal: { type: Number, required: true },           // sum of amount (before discounts)
+    totalDiscount: { type: Number, default: 0 },          // sum of all discountAmounts
+    taxableValue: { type: Number, required: true },       // subtotal - totalDiscount
     cgst: { type: Number, default: 0 },
     sgst: { type: Number, default: 0 },
     igst: { type: Number, default: 0 },
@@ -66,6 +73,7 @@ const invoiceSchema = new mongoose.Schema(
 
     // Transaction type
     isInterState: { type: Boolean, default: false },
+    taxMode: { type: String, enum: ['with_tax', 'without_tax'], default: 'with_tax' },
 
     // Invoice metadata
     paymentTerms: { type: String, default: '' },

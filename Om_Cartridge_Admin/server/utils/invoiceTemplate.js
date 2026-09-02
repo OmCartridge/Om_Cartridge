@@ -1,5 +1,25 @@
+const fs = require('fs');
+const path = require('path');
+
+// Load logo as base64 data URI at module init — works reliably with Puppeteer
+let LOGO_DATA_URI = '';
+const LOGO_PATHS = [
+  path.join(__dirname, '../../client/src/assets/hero.png'),
+  path.join(__dirname, '../assets/logo.png'),
+];
+for (const p of LOGO_PATHS) {
+  try {
+    if (fs.existsSync(p)) {
+      const ext = path.extname(p).slice(1).toLowerCase();
+      const mime = ext === 'png' ? 'image/png' : ext === 'jpg' || ext === 'jpeg' ? 'image/jpeg' : 'image/png';
+      LOGO_DATA_URI = `data:${mime};base64,${fs.readFileSync(p).toString('base64')}`;
+      break;
+    }
+  } catch (_) {}
+}
+
 /**
- * Generate professional GST Tax Invoice HTML
+ * Generate professional A4 GST Tax Invoice HTML
  */
 function generateInvoiceHTML(invoice) {
   const biz = invoice.businessDetails || {};
@@ -12,326 +32,371 @@ function generateInvoiceHTML(invoice) {
     return d.toLocaleDateString('en-IN', { day: '2-digit', month: '2-digit', year: 'numeric' });
   };
 
-  const formatCurrency = (num) => {
+  const fc = (num) => {
     if (num === undefined || num === null) return '0.00';
     return Number(num).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   };
 
-  const itemRows = (invoice.items || [])
-    .map(
-      (item, idx) => `
+  const hasDiscount = (invoice.items || []).some(i => i.discountAmount && i.discountAmount > 0) || (invoice.totalDiscount && invoice.totalDiscount > 0);
+
+  const isWithTax = !invoice.taxMode || invoice.taxMode === 'with_tax';
+
+  // Build item rows
+  const itemRows = (invoice.items || []).map((item, idx) => {
+    const discountCell = hasDiscount
+      ? `<td class="right">${item.discountAmount > 0 ? `<span class="discount-badge">${item.discountType === 'percent' ? item.discountValue + '%' : ''}</span>₹${fc(item.discountAmount)}` : '-'}</td>`
+      : '';
+    return `
     <tr>
       <td class="center">${idx + 1}</td>
-      <td>${item.description || ''}</td>
+      <td class="desc-cell">${item.description || ''}</td>
       <td class="center">${item.hsnSac || ''}</td>
       <td class="center">${item.quantity}</td>
       <td class="center">${item.unit || 'PCS'}</td>
-      <td class="right">₹${formatCurrency(item.rate)}</td>
-      <td class="right">₹${formatCurrency(item.amount)}</td>
-    </tr>`
-    )
-    .join('');
+      <td class="right">₹${fc(item.rate)}</td>
+      ${discountCell}
+      <td class="right fw6">₹${fc(item.finalAmount !== undefined ? item.finalAmount : item.amount)}</td>
+    </tr>`;
+  }).join('');
 
-  // GST summary rows - group by GST rate
+  // GST summary by rate
   const gstGroups = {};
   (invoice.items || []).forEach((item) => {
     const rate = item.gstRate || 18;
     if (!gstGroups[rate]) gstGroups[rate] = { taxable: 0, cgst: 0, sgst: 0, igst: 0 };
-    gstGroups[rate].taxable += item.amount || 0;
+    const taxBase = item.finalAmount !== undefined ? item.finalAmount : item.amount;
+    gstGroups[rate].taxable += taxBase || 0;
     gstGroups[rate].cgst += item.cgstAmount || 0;
     gstGroups[rate].sgst += item.sgstAmount || 0;
     gstGroups[rate].igst += item.igstAmount || 0;
   });
 
-  const gstRows = Object.entries(gstGroups)
-    .map(
-      ([rate, vals]) => `
+  const gstRows = Object.entries(gstGroups).map(([rate, vals]) => `
     <tr>
       <td>${rate}%</td>
-      <td class="right">₹${formatCurrency(vals.taxable)}</td>
-      <td class="right">${invoice.isInterState ? '-' : rate / 2 + '%'}</td>
-      <td class="right">${invoice.isInterState ? '-' : '₹' + formatCurrency(vals.cgst)}</td>
-      <td class="right">${invoice.isInterState ? '-' : rate / 2 + '%'}</td>
-      <td class="right">${invoice.isInterState ? '-' : '₹' + formatCurrency(vals.sgst)}</td>
-      <td class="right">${invoice.isInterState ? rate + '%' : '-'}</td>
-      <td class="right">${invoice.isInterState ? '₹' + formatCurrency(vals.igst) : '-'}</td>
-      <td class="right">₹${formatCurrency((vals.cgst || 0) + (vals.sgst || 0) + (vals.igst || 0))}</td>
-    </tr>`
-    )
-    .join('');
+      <td class="right">₹${fc(vals.taxable)}</td>
+      <td class="center">${invoice.isInterState ? '-' : rate / 2 + '%'}</td>
+      <td class="right">${invoice.isInterState ? '-' : '₹' + fc(vals.cgst)}</td>
+      <td class="center">${invoice.isInterState ? '-' : rate / 2 + '%'}</td>
+      <td class="right">${invoice.isInterState ? '-' : '₹' + fc(vals.sgst)}</td>
+      <td class="center">${invoice.isInterState ? rate + '%' : '-'}</td>
+      <td class="right">${invoice.isInterState ? '₹' + fc(vals.igst) : '-'}</td>
+      <td class="right fw6">₹${fc((vals.cgst || 0) + (vals.sgst || 0) + (vals.igst || 0))}</td>
+    </tr>`).join('');
+
+  const logoHtml = LOGO_DATA_URI
+    ? `<img src="${LOGO_DATA_URI}" alt="Logo" style="width:52px;height:52px;object-fit:contain;" />`
+    : `<div style="width:52px;height:52px;background:#15527A;border-radius:6px;display:flex;align-items:center;justify-content:center;color:#fff;font-size:18px;font-weight:900;">OM</div>`;
+
+  const discountTh = hasDiscount ? `<th style="width:10%">Discount</th>` : '';
+  const amountWidth = hasDiscount ? '12%' : '13%';
 
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Tax Invoice - ${invoice.invoiceNumber}</title>
+<title>Tax Invoice — ${invoice.invoiceNumber}</title>
 <style>
+  @page {
+    size: A4;
+    margin: 12mm 10mm;
+  }
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body {
     font-family: Arial, Helvetica, sans-serif;
-    font-size: 10px;
-    color: #000;
+    font-size: 9.5px;
+    color: #111;
     background: #fff;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
   }
-  .invoice-wrapper {
-    width: 794px;
-    margin: 0 auto;
-    padding: 15px;
-    border: 2px solid #000;
+  .invoice-wrap {
+    width: 100%;
+    border: 1.5px solid #333;
+    min-height: 100%;
   }
-  .invoice-title {
+
+  /* ===== HEADER ===== */
+  .inv-header {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    border-bottom: 1.5px solid #333;
+  }
+  .biz-info {
+    padding: 10px 12px;
+    border-right: 1px solid #333;
+  }
+  .biz-logo-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 6px;
+  }
+  .biz-name {
+    font-size: 15px;
+    font-weight: 900;
+    color: #15527A;
+    line-height: 1.1;
+  }
+  .biz-brand {
+    font-size: 11px;
+    font-weight: 700;
+    color: #c0392b;
+    margin-bottom: 2px;
+  }
+  .biz-addr { font-size: 8.5px; color: #444; line-height: 1.65; }
+  .biz-gstin { font-size: 8.5px; font-weight: 700; margin-top: 3px; }
+
+  .inv-meta {
+    padding: 10px 12px;
+  }
+  .inv-title {
     text-align: center;
-    font-size: 16px;
-    font-weight: bold;
+    font-size: 15px;
+    font-weight: 900;
     letter-spacing: 3px;
-    border-bottom: 1px solid #000;
+    color: #15527A;
+    border-bottom: 1px solid #ddd;
     padding-bottom: 6px;
     margin-bottom: 8px;
   }
-  .header-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    border-bottom: 1px solid #000;
-    margin-bottom: 0;
-  }
-  .header-left {
-    padding: 6px;
-    border-right: 1px solid #000;
-  }
-  .header-right {
-    padding: 6px;
-  }
-  .company-name {
-    font-size: 16px;
-    font-weight: bold;
+  .meta-table { width: 100%; border-collapse: collapse; font-size: 8.5px; }
+  .meta-table td { padding: 2px 4px; vertical-align: top; }
+  .meta-table td:first-child { font-weight: 700; white-space: nowrap; width: 45%; color: #555; }
+  .meta-val { font-weight: 700; color: #111; font-size: 9.5px; }
+
+  /* ===== CONSIGNEE SECTION ===== */
+  .section-bar {
+    background: #f0f4f8;
+    font-weight: 700;
+    font-size: 8.5px;
+    padding: 3px 10px;
+    border-top: 1px solid #333;
+    border-bottom: 1px solid #333;
     color: #15527A;
-    margin-bottom: 2px;
+    letter-spacing: 0.5px;
   }
-  .brand-name {
-    font-size: 12px;
-    font-weight: bold;
-    color: #ED3838;
-    margin-bottom: 4px;
-  }
-  .address-text {
-    font-size: 9px;
-    line-height: 1.6;
-    color: #333;
-  }
-  .gstin-text {
-    font-size: 9px;
-    font-weight: bold;
-    margin-top: 4px;
-  }
-  table.info-table {
-    width: 100%;
-    border-collapse: collapse;
-    font-size: 9px;
-  }
-  table.info-table td {
-    padding: 2px 4px;
-    vertical-align: top;
-  }
-  table.info-table td:first-child {
-    font-weight: bold;
-    white-space: nowrap;
-    width: 40%;
-  }
-  .section-label {
-    background: #f0f0f0;
-    font-weight: bold;
-    font-size: 9px;
-    padding: 3px 6px;
-    border-top: 1px solid #000;
-    border-bottom: 1px solid #000;
-  }
-  .consignee-grid {
+  .cust-grid {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    border-bottom: 1px solid #000;
+    border-bottom: 1px solid #333;
   }
-  .consignee-box {
-    padding: 6px;
-    font-size: 9px;
+  .cust-box {
+    padding: 8px 10px;
+    font-size: 8.5px;
     line-height: 1.7;
   }
-  .consignee-box.left {
-    border-right: 1px solid #000;
-  }
-  .consignee-box strong {
-    display: block;
-    font-size: 10px;
-    color: #000;
-    margin-bottom: 2px;
-  }
-  table.items-table {
+  .cust-box:first-child { border-right: 1px solid #333; }
+  .cust-name { font-size: 10.5px; font-weight: 800; color: #111; margin-bottom: 2px; }
+
+  /* ===== ITEMS TABLE ===== */
+  .items-table {
     width: 100%;
     border-collapse: collapse;
     font-size: 9px;
   }
-  table.items-table th {
-    background: #f5f5f5;
-    border: 1px solid #555;
-    padding: 4px 3px;
-    font-weight: bold;
+  .items-table thead tr {
+    background: #15527A;
+    color: #fff;
+  }
+  .items-table thead th {
+    padding: 5px 4px;
+    font-weight: 700;
+    font-size: 8.5px;
+    border: 1px solid #0e3a57;
     text-align: center;
   }
-  table.items-table td {
-    border: 1px solid #aaa;
-    padding: 3px;
+  .items-table tbody td {
+    border: 1px solid #ccc;
+    padding: 4px 5px;
     vertical-align: top;
+  }
+  .items-table tbody tr:nth-child(even) td { background: #f9fbfc; }
+  .items-table tfoot td {
+    border: 1px solid #aaa;
+    padding: 4px 5px;
+    font-weight: 700;
+    background: #f0f4f8;
   }
   .center { text-align: center; }
   .right { text-align: right; }
+  .fw6 { font-weight: 700; }
+  .desc-cell { text-align: left; word-break: break-word; max-width: 200px; }
+  .discount-badge {
+    display: inline-block;
+    background: #fee2e2;
+    color: #c0392b;
+    font-size: 7px;
+    padding: 1px 3px;
+    border-radius: 3px;
+    margin-right: 3px;
+    font-weight: 700;
+  }
+
+  /* ===== TOTALS ===== */
   .totals-grid {
     display: grid;
-    grid-template-columns: 1fr 1fr;
-    border-top: 1px solid #000;
+    grid-template-columns: 1fr 280px;
+    border-top: 1.5px solid #333;
   }
   .totals-left {
-    padding: 6px;
-    border-right: 1px solid #000;
-    font-size: 9px;
+    padding: 8px 10px;
+    border-right: 1px solid #333;
+    font-size: 8.5px;
   }
   .totals-right {
-    padding: 6px;
+    padding: 8px 10px;
     font-size: 9px;
   }
-  .totals-row {
+  .tot-row {
     display: flex;
     justify-content: space-between;
-    padding: 2px 0;
+    padding: 2.5px 0;
+    border-bottom: 1px solid #f0f0f0;
   }
-  .totals-row.grand {
-    font-weight: bold;
-    font-size: 11px;
-    border-top: 1px solid #000;
-    padding-top: 4px;
-    margin-top: 2px;
+  .tot-row .lbl { color: #555; }
+  .tot-row.discount .lbl { color: #c0392b; }
+  .tot-row.discount .val { color: #c0392b; font-weight: 600; }
+  .tot-row.grand {
+    font-weight: 900;
+    font-size: 12px;
+    color: #15527A;
+    border-top: 2px solid #15527A;
+    border-bottom: none;
+    padding-top: 5px;
+    margin-top: 3px;
   }
-  .amount-words-box {
-    border-top: 1px solid #000;
-    border-bottom: 1px solid #000;
-    padding: 5px 6px;
-    font-size: 9px;
+
+  /* ===== GST SUMMARY ===== */
+  .gst-section {
+    padding: 6px 10px;
+    border-top: 1px solid #333;
+    border-bottom: 1px solid #333;
   }
-  .amount-words-box strong {
-    font-size: 9px;
-  }
-  table.gst-table {
+  .gst-title { font-weight: 700; font-size: 8.5px; margin-bottom: 4px; color: #15527A; }
+  .gst-table {
     width: 100%;
     border-collapse: collapse;
-    font-size: 8.5px;
-    margin-top: 4px;
+    font-size: 8px;
   }
-  table.gst-table th {
-    background: #f0f0f0;
-    border: 1px solid #888;
-    padding: 3px;
-    text-align: center;
-    font-weight: bold;
-  }
-  table.gst-table td {
+  .gst-table th {
+    background: #e8eff6;
     border: 1px solid #aaa;
-    padding: 2px 4px;
+    padding: 3px 4px;
+    text-align: center;
+    font-weight: 700;
+    color: #15527A;
   }
-  .gst-section {
-    padding: 4px 6px;
-    border-bottom: 1px solid #000;
+  .gst-table td {
+    border: 1px solid #ccc;
+    padding: 2px 5px;
   }
-  .tax-words-box {
-    padding: 4px 6px;
-    font-size: 9px;
-    border-bottom: 1px solid #000;
+  .gst-table tfoot td {
+    background: #f0f4f8;
+    font-weight: 700;
+    border: 1px solid #aaa;
   }
+
+  /* ===== FOOTER ===== */
   .footer-grid {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    min-height: 90px;
+    min-height: 100px;
   }
   .footer-left {
-    padding: 6px;
-    border-right: 1px solid #000;
-    font-size: 9px;
+    padding: 8px 10px;
+    border-right: 1px solid #333;
+    font-size: 8.5px;
+    line-height: 1.6;
   }
   .footer-right {
-    padding: 6px;
-    font-size: 9px;
+    padding: 8px 10px;
+    font-size: 8.5px;
     display: flex;
     flex-direction: column;
     align-items: flex-end;
   }
-  .signatory-label {
+  .footer-company { font-weight: 700; font-size: 9.5px; color: #15527A; }
+  .sig-line {
     margin-top: auto;
-    text-align: right;
+    text-align: center;
+    border-top: 1px solid #555;
+    padding-top: 4px;
+    font-size: 8.5px;
+    width: 160px;
   }
-  .invoice-footer {
+  .bottom-bar {
     text-align: center;
     font-size: 8px;
-    padding: 4px;
-    border-top: 1px solid #000;
-    color: #555;
+    padding: 5px;
+    border-top: 1px solid #333;
+    color: #666;
+    background: #fafafa;
   }
-  .logo-svg { display: inline-block; vertical-align: middle; margin-right: 8px; }
+
+  /* Print: keep items together, repeat thead */
+  thead { display: table-header-group; }
+  tfoot { display: table-footer-group; }
+  .items-table tbody tr { page-break-inside: avoid; }
+  .footer-grid { page-break-inside: avoid; }
+  .gst-section { page-break-inside: avoid; }
 </style>
 </head>
 <body>
-<div class="invoice-wrapper">
+<div class="invoice-wrap">
 
-  <!-- Title -->
-  <div class="invoice-title">TAX INVOICE</div>
-
-  <!-- Header: Business + Invoice Info -->
-  <div class="header-grid">
-    <div class="header-left">
-      <svg width="44" height="44" viewBox="0 0 44 44" class="logo-svg">
-        <circle cx="14" cy="22" r="12" fill="#15527A"/>
-        <circle cx="14" cy="22" r="6" fill="#fff"/>
-        <circle cx="14" cy="22" r="3" fill="#ED3838"/>
-        <rect x="28" y="10" width="14" height="24" rx="3" fill="#15527A"/>
-        <rect x="30" y="14" width="10" height="3" rx="1" fill="#fff"/>
-        <rect x="30" y="20" width="10" height="3" rx="1" fill="#fff"/>
-        <rect x="30" y="26" width="10" height="3" rx="1" fill="#fff"/>
-      </svg>
-      <span class="company-name" style="display:inline-block;vertical-align:middle;">${biz.name || 'OM ENTERPRISE'}</span>
-      <div class="brand-name">${biz.brandName || 'OM CARTRIDGE'}</div>
-      <div class="address-text">${(biz.address || '').replace(/\n/g, '<br/>')}</div>
-      <div class="gstin-text">GSTIN/UIN: ${biz.gstin || ''}</div>
-      <div class="address-text">State Name: ${biz.state || 'Gujarat'} &nbsp; Code: ${biz.stateCode || '24'}</div>
-      <div class="address-text" style="margin-top:3px;">Ph: ${biz.phone1 || ''} / ${biz.phone2 || ''}</div>
+  <!-- Header -->
+  <div class="inv-header">
+    <!-- Business Info -->
+    <div class="biz-info">
+      <div class="biz-logo-row">
+        ${logoHtml}
+        <div>
+          <div class="biz-name">${biz.name || 'OM ENTERPRISE'}</div>
+          <div class="biz-brand">${biz.brandName || 'OM CARTRIDGE'}</div>
+        </div>
+      </div>
+      <div class="biz-addr">${(biz.address || '').replace(/\n/g, '<br/>')}</div>
+      <div class="biz-gstin" style="margin-top:4px;">GSTIN/UIN: ${biz.gstin || ''}</div>
+      <div class="biz-addr">State: ${biz.state || 'Gujarat'} &nbsp;|&nbsp; Code: ${biz.stateCode || '24'}</div>
+      ${biz.phone1 ? `<div class="biz-addr" style="margin-top:2px;">📞 ${biz.phone1}${biz.phone2 ? ' / ' + biz.phone2 : ''}</div>` : ''}
     </div>
-    <div class="header-right">
-      <table class="info-table">
-        <tr><td>Invoice No.</td><td>: <strong>${invoice.invoiceNumber}</strong></td></tr>
-        <tr><td>Dated</td><td>: ${formatDate(invoice.invoiceDate)}</td></tr>
-        <tr><td>Delivery Note</td><td>: ${invoice.deliveryNote || ''}</td></tr>
-        <tr><td>Mode/Terms of Payment</td><td>: ${invoice.paymentTerms || ''}</td></tr>
-        <tr><td>Reference No. &amp; Date</td><td>: ${invoice.referenceNumber || ''}</td></tr>
-        <tr><td>Buyer's Order No.</td><td>: ${invoice.buyersOrderNumber || ''}</td></tr>
-        <tr><td>Dispatch Doc No.</td><td>: ${invoice.dispatchDetails || ''}</td></tr>
-        <tr><td>Destination</td><td>: ${invoice.destination || ''}</td></tr>
-        <tr><td>Terms of Delivery</td><td>: ${invoice.termsOfDelivery || ''}</td></tr>
+
+    <!-- Invoice Meta -->
+    <div class="inv-meta">
+      <div class="inv-title">TAX INVOICE</div>
+      <table class="meta-table">
+        <tr><td>Invoice No.</td><td>: <span class="meta-val">${invoice.invoiceNumber}</span></td></tr>
+        <tr><td>Date</td><td>: <span class="meta-val">${formatDate(invoice.invoiceDate)}</span></td></tr>
+        ${invoice.paymentTerms ? `<tr><td>Payment Terms</td><td>: ${invoice.paymentTerms}</td></tr>` : ''}
+        ${invoice.referenceNumber ? `<tr><td>Reference No.</td><td>: ${invoice.referenceNumber}</td></tr>` : ''}
+        ${invoice.buyersOrderNumber ? `<tr><td>Buyer's Order No.</td><td>: ${invoice.buyersOrderNumber}</td></tr>` : ''}
+        ${invoice.deliveryNote ? `<tr><td>Delivery Note</td><td>: ${invoice.deliveryNote}</td></tr>` : ''}
+        ${invoice.dispatchDetails ? `<tr><td>Dispatch Doc No.</td><td>: ${invoice.dispatchDetails}</td></tr>` : ''}
+        ${invoice.destination ? `<tr><td>Destination</td><td>: ${invoice.destination}</td></tr>` : ''}
+        ${invoice.termsOfDelivery ? `<tr><td>Terms of Delivery</td><td>: ${invoice.termsOfDelivery}</td></tr>` : ''}
       </table>
     </div>
   </div>
 
   <!-- Consignee / Buyer -->
-  <div class="section-label">Consignee (Ship to) &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Buyer (Bill to)</div>
-  <div class="consignee-grid">
-    <div class="consignee-box left">
-      <strong>${cust.name || ''}</strong>
-      <div>${(cust.address || '').replace(/\n/g, '<br/>')}</div>
-      ${cust.gstin ? `<div>GSTIN/UIN: ${cust.gstin}</div>` : ''}
-      <div>State Name: ${cust.state || ''} &nbsp; Code: ${cust.stateCode || ''}</div>
-      ${cust.phone ? `<div>Ph: ${cust.phone}</div>` : ''}
+  <div class="section-bar">
+    CONSIGNEE (SHIP TO) &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; BUYER (BILL TO)
+  </div>
+  <div class="cust-grid">
+    <div class="cust-box">
+      <div class="cust-name">${cust.name || ''}</div>
+      ${cust.address ? `<div>${(cust.address).replace(/\n/g, '<br/>')}</div>` : ''}
+      ${cust.gstin ? `<div><b>GSTIN/UIN:</b> ${cust.gstin}</div>` : ''}
+      <div><b>State:</b> ${cust.state || ''}&nbsp; Code: ${cust.stateCode || ''}</div>
+      ${cust.phone ? `<div><b>Ph:</b> ${cust.phone}</div>` : ''}
     </div>
-    <div class="consignee-box">
-      <strong>${cust.name || ''}</strong>
-      <div>${(cust.address || '').replace(/\n/g, '<br/>')}</div>
-      ${cust.gstin ? `<div>GSTIN/UIN: ${cust.gstin}</div>` : ''}
-      <div>State Name: ${cust.state || ''} &nbsp; Code: ${cust.stateCode || ''}</div>
-      ${cust.phone ? `<div>Ph: ${cust.phone}</div>` : ''}
+    <div class="cust-box">
+      <div class="cust-name">${cust.name || ''}</div>
+      ${cust.address ? `<div>${(cust.address).replace(/\n/g, '<br/>')}</div>` : ''}
+      ${cust.gstin ? `<div><b>GSTIN/UIN:</b> ${cust.gstin}</div>` : ''}
+      <div><b>State:</b> ${cust.state || ''}&nbsp; Code: ${cust.stateCode || ''}</div>
+      ${cust.phone ? `<div><b>Ph:</b> ${cust.phone}</div>` : ''}
     </div>
   </div>
 
@@ -339,26 +404,28 @@ function generateInvoiceHTML(invoice) {
   <table class="items-table">
     <thead>
       <tr>
-        <th style="width:4%">Sl No.</th>
-        <th style="width:36%">Description of Goods</th>
-        <th style="width:10%">HSN/SAC</th>
-        <th style="width:8%">Quantity</th>
-        <th style="width:7%">Unit</th>
-        <th style="width:12%">Rate</th>
-        <th style="width:13%">Amount</th>
+        <th style="width:4%">No.</th>
+        <th style="width:${hasDiscount ? '28%' : '36%'}">Description of Goods</th>
+        <th style="width:9%">HSN/SAC</th>
+        <th style="width:7%">Qty</th>
+        <th style="width:6%">Unit</th>
+        <th style="width:10%">Rate (₹)</th>
+        ${discountTh}
+        <th style="width:${amountWidth}">Amount (₹)</th>
       </tr>
     </thead>
     <tbody>
       ${itemRows}
-      <tr style="height:40px"><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+      <tr style="height:32px"><td colspan="${hasDiscount ? 8 : 7}"></td></tr>
     </tbody>
     <tfoot>
       <tr>
-        <td colspan="3" style="font-weight:bold;text-align:right;border-top:1px solid #000;">Total</td>
-        <td class="center" style="font-weight:bold;border-top:1px solid #000;">${(invoice.items || []).reduce((s, i) => s + i.quantity, 0)}</td>
-        <td style="border-top:1px solid #000;"></td>
-        <td style="border-top:1px solid #000;"></td>
-        <td class="right" style="font-weight:bold;border-top:1px solid #000;">₹${formatCurrency(invoice.subtotal)}</td>
+        <td colspan="${hasDiscount ? 3 : 3}" class="right">Total</td>
+        <td class="center">${(invoice.items || []).reduce((s, i) => s + (i.quantity || 0), 0)}</td>
+        <td></td>
+        <td></td>
+        ${hasDiscount ? `<td class="right" style="color:#c0392b;">-₹${fc(invoice.totalDiscount || 0)}</td>` : ''}
+        <td class="right">₹${fc(invoice.taxableValue)}</td>
       </tr>
     </tfoot>
   </table>
@@ -366,95 +433,85 @@ function generateInvoiceHTML(invoice) {
   <!-- Totals -->
   <div class="totals-grid">
     <div class="totals-left">
-      <div style="font-weight:bold;margin-bottom:4px;">Amount Chargeable (in words)</div>
-      <div>${invoice.amountInWords || ''}</div>
-      <div style="margin-top:6px;font-size:8px;font-style:italic;">E. &amp; O.E.</div>
+      <div style="font-weight:700;margin-bottom:5px;font-size:9px;color:#15527A;">Amount Chargeable (in words)</div>
+      <div style="font-style:italic;font-size:8.5px;line-height:1.5;">${invoice.amountInWords || ''}</div>
+      <div style="margin-top:10px;font-size:8px;color:#777;font-style:italic;">E. &amp; O.E. — Errors and Omissions Excepted</div>
+      ${!isWithTax ? `<div style="margin-top:10px;display:inline-block;background:#fef3c7;border:1px solid #fde68a;color:#92400e;padding:4px 10px;border-radius:5px;font-size:8.5px;font-weight:700;">⚠ WITHOUT TAX INVOICE — No GST Applied</div>` : ''}
     </div>
     <div class="totals-right">
-      <div class="totals-row">
-        <span>Taxable Value</span>
-        <span>₹${formatCurrency(invoice.taxableValue)}</span>
-      </div>
+      ${hasDiscount ? `<div class="tot-row"><span class="lbl">Subtotal (Before Discount)</span><span>₹${fc(invoice.subtotal)}</span></div>
+      <div class="tot-row discount"><span class="lbl">(-) Total Discount</span><span class="val">-₹${fc(invoice.totalDiscount || 0)}</span></div>` : ''}
+      <div class="tot-row"><span class="lbl">${hasDiscount ? 'Taxable Value' : 'Subtotal'}</span><span>₹${fc(invoice.taxableValue)}</span></div>
+      ${isWithTax ? `
       ${!invoice.isInterState ? `
-      <div class="totals-row">
-        <span>CGST @ 9%</span>
-        <span>₹${formatCurrency(invoice.cgst)}</span>
-      </div>
-      <div class="totals-row">
-        <span>SGST @ 9%</span>
-        <span>₹${formatCurrency(invoice.sgst)}</span>
-      </div>` : `
-      <div class="totals-row">
-        <span>IGST @ 18%</span>
-        <span>₹${formatCurrency(invoice.igst)}</span>
-      </div>`}
-      <div class="totals-row">
-        <span>Less : Round Off</span>
-        <span>${invoice.roundOff < 0 ? '-₹' + formatCurrency(Math.abs(invoice.roundOff)) : invoice.roundOff > 0 ? '+₹' + formatCurrency(invoice.roundOff) : '₹0.00'}</span>
-      </div>
-      <div class="totals-row grand">
-        <span>Grand Total</span>
-        <span>₹${formatCurrency(invoice.grandTotal)}</span>
-      </div>
+      <div class="tot-row"><span class="lbl">CGST</span><span>₹${fc(invoice.cgst)}</span></div>
+      <div class="tot-row"><span class="lbl">SGST</span><span>₹${fc(invoice.sgst)}</span></div>` : `
+      <div class="tot-row"><span class="lbl">IGST</span><span>₹${fc(invoice.igst)}</span></div>`}
+      <div class="tot-row"><span class="lbl">Total Tax</span><span>₹${fc(invoice.totalTax)}</span></div>` : `
+      <div class="tot-row" style="color:#92400e;"><span class="lbl">Tax (Without Tax Mode)</span><span>₹0.00</span></div>`}
+      <div class="tot-row"><span class="lbl">Round Off</span><span>${invoice.roundOff < 0 ? '-₹' + fc(Math.abs(invoice.roundOff)) : invoice.roundOff > 0 ? '+₹' + fc(invoice.roundOff) : '₹0.00'}</span></div>
+      <div class="tot-row grand"><span>GRAND TOTAL</span><span>₹${fc(invoice.grandTotal)}</span></div>
     </div>
   </div>
 
   <!-- GST Summary -->
+  ${isWithTax ? `
   <div class="gst-section">
-    <div style="font-weight:bold;font-size:9px;margin-bottom:3px;">Tax Amount (in words): ${invoice.taxAmountInWords || ''}</div>
+    <div class="gst-title">Tax Amount (in words): <span style="font-weight:400;font-style:italic;">${invoice.taxAmountInWords || ''}</span></div>
     <table class="gst-table">
       <thead>
         <tr>
-          <th>HSN/SAC</th>
+          <th>GST Rate</th>
           <th>Taxable Value</th>
-          <th>Central Tax %</th>
-          <th>Central Tax Amt</th>
-          <th>State Tax %</th>
-          <th>State Tax Amt</th>
+          <th>CGST %</th>
+          <th>CGST Amt</th>
+          <th>SGST %</th>
+          <th>SGST Amt</th>
           <th>IGST %</th>
           <th>IGST Amt</th>
           <th>Total Tax</th>
         </tr>
       </thead>
-      <tbody>
-        ${gstRows}
-      </tbody>
+      <tbody>${gstRows}</tbody>
       <tfoot>
         <tr>
-          <td style="font-weight:bold">Total</td>
-          <td class="right" style="font-weight:bold">₹${formatCurrency(invoice.taxableValue)}</td>
+          <td class="fw6">Total</td>
+          <td class="right fw6">₹${fc(invoice.taxableValue)}</td>
           <td></td>
-          <td class="right" style="font-weight:bold">${!invoice.isInterState ? '₹' + formatCurrency(invoice.cgst) : '-'}</td>
+          <td class="right fw6">${!invoice.isInterState ? '₹' + fc(invoice.cgst) : '-'}</td>
           <td></td>
-          <td class="right" style="font-weight:bold">${!invoice.isInterState ? '₹' + formatCurrency(invoice.sgst) : '-'}</td>
+          <td class="right fw6">${!invoice.isInterState ? '₹' + fc(invoice.sgst) : '-'}</td>
           <td></td>
-          <td class="right" style="font-weight:bold">${invoice.isInterState ? '₹' + formatCurrency(invoice.igst) : '-'}</td>
-          <td class="right" style="font-weight:bold">₹${formatCurrency(invoice.totalTax)}</td>
+          <td class="right fw6">${invoice.isInterState ? '₹' + fc(invoice.igst) : '-'}</td>
+          <td class="right fw6">₹${fc(invoice.totalTax)}</td>
         </tr>
       </tfoot>
     </table>
-  </div>
+  </div>` : `
+  <div class="gst-section" style="background:#fffbeb;">
+    <div class="gst-title" style="color:#92400e;">
+      ⚠ TAX NOT APPLICABLE — This invoice was generated WITHOUT TAX. Grand Total = ₹${fc(invoice.grandTotal)} (includes no GST).
+    </div>
+  </div>`}
 
-  <!-- Declaration + Bank + Signature -->
+  <!-- Footer: Declaration + Bank + Signatory -->
   <div class="footer-grid">
     <div class="footer-left">
-      <div style="font-weight:bold;margin-bottom:3px;">Declaration</div>
+      <div style="font-weight:700;font-size:9px;color:#15527A;margin-bottom:4px;">Declaration</div>
       <div>${invoice.declaration || ''}</div>
-      <div style="margin-top:8px;font-weight:bold;">Bank Details:</div>
-      <div>Bank: ${bank.bankName || ''}</div>
-      <div>A/c No.: ${bank.accountNo || ''}</div>
-      <div>Branch &amp; IFSC: ${bank.branch || ''} &amp; ${bank.ifsc || ''}</div>
+      <div style="margin-top:10px;font-weight:700;font-size:9px;color:#15527A;">Bank Details</div>
+      <div>Bank: <b>${bank.bankName || ''}</b></div>
+      <div>A/c No.: <b>${bank.accountNo || ''}</b></div>
+      <div>Branch &amp; IFSC: ${bank.branch || ''} &amp; <b>${bank.ifsc || ''}</b></div>
     </div>
     <div class="footer-right">
-      <div style="font-weight:bold;">for ${biz.name || 'OM ENTERPRISE'}</div>
-      <div style="height:50px;"></div>
-      <div class="signatory-label">
-        <div style="border-top:1px solid #000;padding-top:4px;">Authorised Signatory</div>
-      </div>
+      <div class="footer-company">For ${biz.name || 'OM ENTERPRISE'}</div>
+      <div style="flex:1;min-height:60px;"></div>
+      <div class="sig-line">Authorised Signatory</div>
     </div>
   </div>
 
-  <div class="invoice-footer">
+  <div class="bottom-bar">
     ${invoice.jurisdiction || 'SUBJECT TO AHMEDABAD JURISDICTION'} &nbsp;|&nbsp; This is a Computer Generated Invoice
   </div>
 

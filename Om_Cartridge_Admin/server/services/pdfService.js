@@ -1,48 +1,25 @@
-const puppeteer = require('puppeteer');
-const path = require('path');
-const fs = require('fs');
+const htmlPdf = require('html-pdf-node');
 const { generateInvoiceHTML } = require('../utils/invoiceTemplate');
 
-const INVOICES_DIR = path.join(__dirname, '../invoices');
-
-// Ensure invoices directory exists
-if (!fs.existsSync(INVOICES_DIR)) {
-  fs.mkdirSync(INVOICES_DIR, { recursive: true });
-}
-
 /**
- * Generate PDF from invoice data using Puppeteer
- * Returns the path to the saved PDF file
+ * Generate PDF from invoice data using html-pdf-node.
+ * Returns a Buffer — no file is written to disk.
+ * This is Vercel-compatible (no Puppeteer / no local Chrome required).
  */
 async function generateInvoicePDF(invoice) {
   const html = generateInvoiceHTML(invoice);
 
-  // Sanitize invoice number for filename
-  const safeName = (invoice.invoiceNumber || 'invoice').replace(/[\/\\:*?"<>|]/g, '-');
-  const filename = `OM-INV-${safeName}.pdf`;
-  const filepath = path.join(INVOICES_DIR, filename);
+  const file = { content: html };
 
-  let browser;
-  try {
-    browser = await puppeteer.launch({
-      headless: 'new',
-      args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'],
-    });
+  const options = {
+    format: 'A4',
+    printBackground: true,
+    margin: { top: '10mm', bottom: '10mm', left: '8mm', right: '8mm' },
+    args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'],
+  };
 
-    const page = await browser.newPage();
-    await page.setContent(html, { waitUntil: 'networkidle0' });
-
-    await page.pdf({
-      path: filepath,
-      format: 'A4',
-      printBackground: true,
-      margin: { top: '10mm', bottom: '10mm', left: '8mm', right: '8mm' },
-    });
-
-    return { filename, filepath };
-  } finally {
-    if (browser) await browser.close();
-  }
+  const pdfBuffer = await htmlPdf.generatePdf(file, options);
+  return pdfBuffer; // Buffer
 }
 
 module.exports = { generateInvoicePDF };

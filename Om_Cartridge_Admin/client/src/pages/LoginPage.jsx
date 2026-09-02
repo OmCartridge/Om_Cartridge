@@ -78,7 +78,7 @@ const LoginPage = () => {
                 id="login-email"
                 type="email"
                 className={`form-control ${errors.email ? 'error' : ''}`}
-                placeholder="admin@omcartridge.local"
+                placeholder="admin@example.com"
                 value={email}
                 onChange={e => setEmail(e.target.value)}
                 autoComplete="email"

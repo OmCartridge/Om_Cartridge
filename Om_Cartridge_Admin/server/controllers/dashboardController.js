@@ -1,6 +1,8 @@
 const Product = require('../models/Product');
 const Invoice = require('../models/Invoice');
 
+const LOW_STOCK_THRESHOLD = 20; // quantity < 20
+
 // GET /api/dashboard/summary
 const getSummary = async (req, res, next) => {
   try {
@@ -8,49 +10,29 @@ const getSummary = async (req, res, next) => {
     const startOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate());
     const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
 
-    const [
-      totalProducts,
-      products,
-      totalInvoices,
-      todaysSales,
-      monthSales,
-    ] = await Promise.all([
+    const [totalProducts, products, totalInvoices, todaysSales, monthSales] = await Promise.all([
       Product.countDocuments({ isActive: true }),
       Product.find({ isActive: true }),
       Invoice.countDocuments({ status: { $ne: 'CANCELLED' } }),
       Invoice.aggregate([
-        {
-          $match: {
-            invoiceDate: { $gte: startOfDay },
-            status: { $ne: 'CANCELLED' },
-          },
-        },
+        { $match: { invoiceDate: { $gte: startOfDay }, status: { $ne: 'CANCELLED' } } },
         { $group: { _id: null, total: { $sum: '$grandTotal' } } },
       ]),
       Invoice.aggregate([
-        {
-          $match: {
-            invoiceDate: { $gte: startOfMonth },
-            status: { $ne: 'CANCELLED' },
-          },
-        },
+        { $match: { invoiceDate: { $gte: startOfMonth }, status: { $ne: 'CANCELLED' } } },
         { $group: { _id: null, total: { $sum: '$grandTotal' } } },
       ]),
     ]);
 
     const totalStockQuantity = products.reduce((sum, p) => sum + (p.quantity || 0), 0);
-    const lowStockCount = products.filter(
-      (p) => p.quantity > 0 && p.quantity <= p.minimumStock
-    ).length;
-    const outOfStockCount = products.filter((p) => p.quantity <= 0).length;
+    // Dashboard low-stock uses fixed threshold: quantity < 20
+    const lowStockCount = products.filter(p => p.quantity < LOW_STOCK_THRESHOLD).length;
+    const outOfStockCount = products.filter(p => p.quantity <= 0).length;
 
     res.json({
       success: true,
       data: {
-        totalProducts,
-        totalStockQuantity,
-        lowStockCount,
-        outOfStockCount,
+        totalProducts, totalStockQuantity, lowStockCount, outOfStockCount,
         totalInvoices,
         todaysSales: todaysSales[0]?.total || 0,
         monthSales: monthSales[0]?.total || 0,
@@ -69,7 +51,6 @@ const getRecentInvoices = async (req, res, next) => {
       .sort({ createdAt: -1 })
       .limit(10)
       .lean();
-
     res.json({ success: true, data: invoices });
   } catch (error) {
     next(error);
@@ -77,12 +58,15 @@ const getRecentInvoices = async (req, res, next) => {
 };
 
 // GET /api/dashboard/low-stock
+// Returns products where quantity < 20 (fixed threshold for dashboard alert)
 const getLowStock = async (req, res, next) => {
   try {
     const products = await Product.find({
       isActive: true,
-      $expr: { $lte: ['$quantity', '$minimumStock'] },
-    }).lean();
+      quantity: { $lt: LOW_STOCK_THRESHOLD },
+    })
+      .sort({ quantity: 1 }) // worst first
+      .lean();
 
     res.json({ success: true, data: products });
   } catch (error) {

@@ -147,8 +147,10 @@ const InvoiceViewPage = () => {
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '10px' }}>
           <thead>
             <tr style={{ background: '#f5f5f5' }}>
-              {['Sl No.', 'Description of Goods', 'HSN/SAC', 'Quantity', 'Unit', 'Rate', 'Amount'].map(h => (
-                <th key={h} style={{ border: '1px solid #999', padding: '5px 6px', textAlign: h === 'Amount' || h === 'Rate' ? 'right' : h === 'Quantity' || h === 'Unit' || h === 'Sl No.' ? 'center' : 'left', fontWeight: 'bold', fontSize: '10px' }}>{h}</th>
+              {['Sl No.', 'Description of Goods', 'HSN/SAC', 'Quantity', 'Unit', 'Rate',
+                ...(invoice.totalDiscount > 0 ? ['Discount'] : []),
+                'Amount'].map(h => (
+                <th key={h} style={{ border: '1px solid #999', padding: '5px 6px', textAlign: h === 'Amount' || h === 'Rate' || h === 'Discount' ? 'right' : h === 'Quantity' || h === 'Unit' || h === 'Sl No.' ? 'center' : 'left', fontWeight: 'bold', fontSize: '10px' }}>{h}</th>
               ))}
             </tr>
           </thead>
@@ -161,18 +163,28 @@ const InvoiceViewPage = () => {
                 <td style={{ border: '1px solid #ccc', padding: '4px 6px', textAlign: 'center' }}>{item.quantity}</td>
                 <td style={{ border: '1px solid #ccc', padding: '4px 6px', textAlign: 'center' }}>{item.unit}</td>
                 <td style={{ border: '1px solid #ccc', padding: '4px 6px', textAlign: 'right' }}>₹{fmt(item.rate)}</td>
-                <td style={{ border: '1px solid #ccc', padding: '4px 6px', textAlign: 'right' }}>₹{fmt(item.amount)}</td>
+                {invoice.totalDiscount > 0 && (
+                  <td style={{ border: '1px solid #ccc', padding: '4px 6px', textAlign: 'right', color: '#c0392b' }}>
+                    {item.discountAmount > 0 ? (
+                      <span>
+                        {item.discountType === 'percent' ? `${item.discountValue}% ` : ''}-₹{fmt(item.discountAmount)}
+                      </span>
+                    ) : '-'}
+                  </td>
+                )}
+                <td style={{ border: '1px solid #ccc', padding: '4px 6px', textAlign: 'right' }}>₹{fmt(item.finalAmount !== undefined ? item.finalAmount : item.amount)}</td>
               </tr>
             ))}
             <tr style={{ height: '40px' }}>
-              {['', '', '', '', '', '', ''].map((_, i) => <td key={i} style={{ border: '1px solid #ccc' }} />)}
+              {Array((invoice.totalDiscount > 0 ? 8 : 7)).fill(null).map((_, i) => <td key={i} style={{ border: '1px solid #ccc' }} />)}
             </tr>
             <tr style={{ fontWeight: 'bold', background: '#f9f9f9' }}>
               <td colSpan="3" style={{ border: '1px solid #999', padding: '5px 6px', textAlign: 'right' }}>Total</td>
               <td style={{ border: '1px solid #999', padding: '5px 6px', textAlign: 'center' }}>{invoice.items.reduce((s, i) => s + i.quantity, 0)}</td>
               <td style={{ border: '1px solid #999', padding: '5px 6px' }} />
               <td style={{ border: '1px solid #999', padding: '5px 6px' }} />
-              <td style={{ border: '1px solid #999', padding: '5px 6px', textAlign: 'right' }}>₹{fmt(invoice.subtotal)}</td>
+              {invoice.totalDiscount > 0 && <td style={{ border: '1px solid #999', padding: '5px 6px', textAlign: 'right', color: '#c0392b' }}>-₹{fmt(invoice.totalDiscount)}</td>}
+              <td style={{ border: '1px solid #999', padding: '5px 6px', textAlign: 'right' }}>₹{fmt(invoice.taxableValue)}</td>
             </tr>
           </tbody>
         </table>
@@ -183,22 +195,59 @@ const InvoiceViewPage = () => {
             <div style={{ fontWeight: 'bold', marginBottom: '4px' }}>Amount Chargeable (in words)</div>
             <div style={{ fontStyle: 'italic' }}>{invoice.amountInWords}</div>
             <div style={{ marginTop: '8px', fontSize: '9px', color: '#555' }}>E. &amp; O.E.</div>
+            {invoice.taxMode === 'without_tax' && (
+              <div style={{ marginTop: '8px', display: 'inline-block', background: '#fffbeb', border: '1px solid #fde68a', color: '#92400e', padding: '3px 8px', borderRadius: '4px', fontSize: '9px', fontWeight: 'bold' }}>
+                ⚠ WITHOUT TAX INVOICE
+              </div>
+            )}
           </div>
           <div style={{ padding: '10px', fontSize: '10px' }}>
-            {[
-              ['Taxable Value', `₹${fmt(invoice.taxableValue)}`],
-              ...(!invoice.isInterState ? [
-                ['CGST @ 9%', `₹${fmt(invoice.cgst)}`],
-                ['SGST @ 9%', `₹${fmt(invoice.sgst)}`],
-              ] : [
-                ['IGST @ 18%', `₹${fmt(invoice.igst)}`],
-              ]),
-              ['Less: Round Off', `${invoice.roundOff < 0 ? '-' : '+'}₹${fmt(Math.abs(invoice.roundOff))}`],
-            ].map(([label, val]) => (
-              <div key={label} style={{ display: 'flex', justifyContent: 'space-between', padding: '2px 0', borderBottom: '1px solid #eee' }}>
-                <span>{label}</span><span>{val}</span>
+            {invoice.totalDiscount > 0 && (
+              <div style={{ display: 'flex', justifyContent: 'space-between', padding: '2px 0', borderBottom: '1px solid #eee' }}>
+                <span>Subtotal (Before Discount)</span><span>₹{fmt(invoice.subtotal)}</span>
               </div>
-            ))}
+            )}
+            {invoice.totalDiscount > 0 && (
+              <div style={{ display: 'flex', justifyContent: 'space-between', padding: '2px 0', borderBottom: '1px solid #eee', color: '#c0392b', fontWeight: 600 }}>
+                <span>(-) Total Discount</span><span>-₹{fmt(invoice.totalDiscount)}</span>
+              </div>
+            )}
+            <div style={{ display: 'flex', justifyContent: 'space-between', padding: '2px 0', borderBottom: '1px solid #eee' }}>
+              <span>{invoice.totalDiscount > 0 ? 'Taxable Value' : 'Subtotal'}</span>
+              <span>₹{fmt(invoice.taxableValue)}</span>
+            </div>
+
+            {invoice.taxMode !== 'without_tax' ? (
+              <>
+                {!invoice.isInterState ? (
+                  <>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', padding: '2px 0', borderBottom: '1px solid #eee' }}>
+                      <span>CGST</span><span>₹{fmt(invoice.cgst)}</span>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', padding: '2px 0', borderBottom: '1px solid #eee' }}>
+                      <span>SGST</span><span>₹{fmt(invoice.sgst)}</span>
+                    </div>
+                  </>
+                ) : (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', padding: '2px 0', borderBottom: '1px solid #eee' }}>
+                    <span>IGST</span><span>₹{fmt(invoice.igst)}</span>
+                  </div>
+                )}
+                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '2px 0', borderBottom: '1px solid #eee' }}>
+                  <span>Total Tax</span><span>₹{fmt(invoice.totalTax)}</span>
+                </div>
+              </>
+            ) : (
+              <div style={{ display: 'flex', justifyContent: 'space-between', padding: '2px 0', borderBottom: '1px solid #eee', color: '#92400e' }}>
+                <span>Tax (Without Tax Mode)</span><span>₹0.00</span>
+              </div>
+            )}
+
+            <div style={{ display: 'flex', justifyContent: 'space-between', padding: '2px 0', borderBottom: '1px solid #eee' }}>
+              <span>Less: Round Off</span>
+              <span>{invoice.roundOff < 0 ? '-' : '+'}₹{fmt(Math.abs(invoice.roundOff))}</span>
+            </div>
+
             <div style={{ display: 'flex', justifyContent: 'space-between', padding: '5px 0', fontWeight: 'bold', fontSize: '12px', borderTop: '2px solid #000', marginTop: '3px' }}>
               <span>Grand Total</span><span>₹{fmt(invoice.grandTotal)}</span>
             </div>
@@ -206,54 +255,53 @@ const InvoiceViewPage = () => {
         </div>
 
         {/* GST Summary */}
-        <div style={{ padding: '8px', borderTop: '1px solid #000' }}>
-          <div style={{ fontWeight: 'bold', fontSize: '10px', marginBottom: '4px' }}>
-            Tax Amount (in words): {invoice.taxAmountInWords}
+        {invoice.taxMode !== 'without_tax' ? (
+          <div style={{ padding: '8px', borderTop: '1px solid #000' }}>
+            <div style={{ fontWeight: 'bold', fontSize: '10px', marginBottom: '4px' }}>
+              Tax Amount (in words): {invoice.taxAmountInWords}
+            </div>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '9.5px' }}>
+              <thead>
+                <tr style={{ background: '#f5f5f5' }}>
+                  {['HSN/SAC', 'Taxable Value', 'CGST %', 'CGST Amt', 'SGST %', 'SGST Amt', 'IGST %', 'IGST Amt', 'Total Tax'].map(h => (
+                    <th key={h} style={{ border: '1px solid #999', padding: '3px 5px', textAlign: 'center', fontWeight: 'bold' }}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {(() => {
+                  const map = {};
+                  invoice.items.forEach(i => {
+                    const key = i.hsnSac || 'OTHER';
+                    if (!map[key]) map[key] = { hsn: key, taxable: 0, cgstAmt: 0, sgstAmt: 0, igstAmt: 0, gstRate: i.gstRate || 18 };
+                    const finalAmt = i.finalAmount !== undefined ? i.finalAmount : i.amount;
+                    map[key].taxable += finalAmt;
+                    map[key].cgstAmt += i.cgstAmount || 0;
+                    map[key].sgstAmt += i.sgstAmount || 0;
+                    map[key].igstAmt += i.igstAmount || 0;
+                  });
+                  return Object.values(map).map((row, idx) => (
+                    <tr key={idx}>
+                      <td style={{ border: '1px solid #ccc', padding: '3px 5px', textAlign: 'center' }}>{row.hsn}</td>
+                      <td style={{ border: '1px solid #ccc', padding: '3px 5px', textAlign: 'right' }}>₹{fmt(row.taxable)}</td>
+                      <td style={{ border: '1px solid #ccc', padding: '3px 5px', textAlign: 'center' }}>{!invoice.isInterState ? `${row.gstRate / 2}%` : '-'}</td>
+                      <td style={{ border: '1px solid #ccc', padding: '3px 5px', textAlign: 'right' }}>{!invoice.isInterState ? `₹${fmt(row.cgstAmt)}` : '-'}</td>
+                      <td style={{ border: '1px solid #ccc', padding: '3px 5px', textAlign: 'center' }}>{!invoice.isInterState ? `${row.gstRate / 2}%` : '-'}</td>
+                      <td style={{ border: '1px solid #ccc', padding: '3px 5px', textAlign: 'right' }}>{!invoice.isInterState ? `₹${fmt(row.sgstAmt)}` : '-'}</td>
+                      <td style={{ border: '1px solid #ccc', padding: '3px 5px', textAlign: 'center' }}>{invoice.isInterState ? `${row.gstRate}%` : '-'}</td>
+                      <td style={{ border: '1px solid #ccc', padding: '3px 5px', textAlign: 'right' }}>{invoice.isInterState ? `₹${fmt(row.igstAmt)}` : '-'}</td>
+                      <td style={{ border: '1px solid #ccc', padding: '3px 5px', textAlign: 'right' }}>₹{fmt(row.cgstAmt + row.sgstAmt + row.igstAmt)}</td>
+                    </tr>
+                  ));
+                })()}
+              </tbody>
+            </table>
           </div>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '9.5px' }}>
-            <thead>
-              <tr style={{ background: '#f5f5f5' }}>
-                {['HSN/SAC', 'Taxable Value', 'CGST %', 'CGST Amt', 'SGST %', 'SGST Amt', 'IGST %', 'IGST Amt', 'Total Tax'].map(h => (
-                  <th key={h} style={{ border: '1px solid #999', padding: '3px 5px', textAlign: 'center', fontWeight: 'bold' }}>{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {(() => {
-                const groups = {};
-                invoice.items.forEach(i => {
-                  const r = i.gstRate;
-                  if (!groups[r]) groups[r] = { taxable: 0, cgst: 0, sgst: 0, igst: 0 };
-                  groups[r].taxable += i.amount;
-                  groups[r].cgst += i.cgstAmount || 0;
-                  groups[r].sgst += i.sgstAmount || 0;
-                  groups[r].igst += i.igstAmount || 0;
-                });
-                return Object.entries(groups).map(([rate, v]) => (
-                  <tr key={rate}>
-                    <td style={{ border: '1px solid #ccc', padding: '3px 5px' }}>{rate}%</td>
-                    <td style={{ border: '1px solid #ccc', padding: '3px 5px', textAlign: 'right' }}>₹{fmt(v.taxable)}</td>
-                    <td style={{ border: '1px solid #ccc', padding: '3px 5px', textAlign: 'center' }}>{!invoice.isInterState ? rate / 2 + '%' : '-'}</td>
-                    <td style={{ border: '1px solid #ccc', padding: '3px 5px', textAlign: 'right' }}>{!invoice.isInterState ? '₹' + fmt(v.cgst) : '-'}</td>
-                    <td style={{ border: '1px solid #ccc', padding: '3px 5px', textAlign: 'center' }}>{!invoice.isInterState ? rate / 2 + '%' : '-'}</td>
-                    <td style={{ border: '1px solid #ccc', padding: '3px 5px', textAlign: 'right' }}>{!invoice.isInterState ? '₹' + fmt(v.sgst) : '-'}</td>
-                    <td style={{ border: '1px solid #ccc', padding: '3px 5px', textAlign: 'center' }}>{invoice.isInterState ? rate + '%' : '-'}</td>
-                    <td style={{ border: '1px solid #ccc', padding: '3px 5px', textAlign: 'right' }}>{invoice.isInterState ? '₹' + fmt(v.igst) : '-'}</td>
-                    <td style={{ border: '1px solid #ccc', padding: '3px 5px', textAlign: 'right' }}>₹{fmt((v.cgst || 0) + (v.sgst || 0) + (v.igst || 0))}</td>
-                  </tr>
-                ));
-              })()}
-              <tr style={{ fontWeight: 'bold', background: '#f9f9f9' }}>
-                <td style={{ border: '1px solid #999', padding: '3px 5px' }}>Total</td>
-                <td style={{ border: '1px solid #999', padding: '3px 5px', textAlign: 'right' }}>₹{fmt(invoice.taxableValue)}</td>
-                <td colSpan="2" style={{ border: '1px solid #999', padding: '3px 5px', textAlign: 'right' }}>{!invoice.isInterState ? '₹' + fmt(invoice.cgst) : '-'}</td>
-                <td colSpan="2" style={{ border: '1px solid #999', padding: '3px 5px', textAlign: 'right' }}>{!invoice.isInterState ? '₹' + fmt(invoice.sgst) : '-'}</td>
-                <td colSpan="2" style={{ border: '1px solid #999', padding: '3px 5px', textAlign: 'right' }}>{invoice.isInterState ? '₹' + fmt(invoice.igst) : '-'}</td>
-                <td style={{ border: '1px solid #999', padding: '3px 5px', textAlign: 'right' }}>₹{fmt(invoice.totalTax)}</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
+        ) : (
+          <div style={{ padding: '8px 12px', borderTop: '1px solid #000', background: '#fffbeb', fontSize: '9.5px', color: '#92400e', fontWeight: 'bold' }}>
+            ⚠ TAX NOT APPLICABLE — This invoice was generated WITHOUT TAX. Grand Total = ₹{fmt(invoice.grandTotal)} (no GST applied).
+          </div>
+        )}
 
         {/* Footer - Declaration + Bank + Signatory */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', borderTop: '1px solid #000', minHeight: '90px' }}>

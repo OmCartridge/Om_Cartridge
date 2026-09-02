@@ -1,5 +1,9 @@
 const Product = require('../models/Product');
 const StockMovement = require('../models/StockMovement');
+const { parseCSV } = require('../utils/invoiceUtils');
+
+const VALID_GST_RATES = [0, 5, 12, 18, 28];
+const VALID_UNITS = ['PCS', 'BOX', 'PACK', 'SET', 'ROLL', 'KG', 'LTR', 'MTR'];
 
 // GET /api/products
 const getProducts = async (req, res, next) => {
@@ -203,6 +207,103 @@ const getLowStockProducts = async (req, res, next) => {
   }
 };
 
+// POST /api/products/import-csv
+// Body: { csvContent: string, dryRun: boolean }
+const importProductsCSV = async (req, res, next) => {
+  try {
+    const { csvContent, dryRun = true } = req.body;
+
+    if (!csvContent || !csvContent.trim()) {
+      return res.status(400).json({ success: false, message: 'CSV content is required.' });
+    }
+
+    const { headers, rows } = parseCSV(csvContent);
+    if (rows.length === 0) {
+      return res.status(400).json({ success: false, message: 'CSV is empty or has no data rows.' });
+    }
+
+    const requiredCols = ['name', 'sku'];
+    const missingCols = requiredCols.filter(c => !headers.includes(c));
+    if (missingCols.length > 0) {
+      return res.status(400).json({
+        success: false,
+        message: `Missing required CSV columns: ${missingCols.join(', ')}. Required: name, sku. Optional: hsnsac, description, quantity, unit, purchaserate, sellingrate, gstrate, minimumstock`,
+      });
+    }
+
+    const results = { newCount: 0, updateCount: 0, errorCount: 0, errors: [], preview: [] };
+
+    for (const row of rows) {
+      const rowNum = row._rowNumber;
+      const rowErrors = [];
+
+      const name = (row.name || '').trim();
+      const sku = (row.sku || '').trim().toUpperCase();
+      const hsnSac = (row.hsnsac || row['hsn/sac'] || row.hsn || '').trim();
+      const description = (row.description || '').trim();
+      const quantityRaw = row.quantity || '0';
+      const quantity = parseFloat(quantityRaw);
+      const unit = (row.unit || 'PCS').trim().toUpperCase();
+      const purchaseRateRaw = row.purchaserate || row['purchase rate'] || '0';
+      const purchaseRate = parseFloat(purchaseRateRaw);
+      const sellingRateRaw = row.sellingrate || row['selling rate'] || '0';
+      const sellingRate = parseFloat(sellingRateRaw);
+      const gstRateRaw = row.gstrate || row['gst rate'] || '18';
+      const gstRate = parseInt(gstRateRaw, 10);
+      const minimumStockRaw = row.minimumstock || row['minimum stock'] || '5';
+      const minimumStock = parseInt(minimumStockRaw, 10);
+
+      if (!name) rowErrors.push('Product name is required');
+      if (!sku) rowErrors.push('SKU is required');
+      if (isNaN(quantity) || quantity < 0) rowErrors.push(`Invalid quantity: "${quantityRaw}"`);
+      if (isNaN(purchaseRate) || purchaseRate < 0) rowErrors.push(`Invalid purchase rate: "${purchaseRateRaw}"`);
+      if (isNaN(sellingRate) || sellingRate < 0) rowErrors.push(`Invalid selling rate: "${sellingRateRaw}"`);
+      if (!VALID_GST_RATES.includes(gstRate)) rowErrors.push(`Invalid GST rate: "${gstRateRaw}". Must be 0, 5, 12, 18, or 28`);
+      if (isNaN(minimumStock) || minimumStock < 0) rowErrors.push(`Invalid minimum stock: "${minimumStockRaw}"`);
+
+      if (rowErrors.length > 0) {
+        results.errorCount++;
+        results.errors.push({ row: rowNum, messages: rowErrors });
+        results.preview.push({ row: rowNum, action: 'error', name, sku, errors: rowErrors });
+        continue;
+      }
+
+      const existing = sku ? await Product.findOne({ sku }).lean() : null;
+      const action = existing ? 'update' : 'create';
+      if (action === 'update') results.updateCount++;
+      else results.newCount++;
+
+      results.preview.push({ row: rowNum, action, name, sku, quantity, sellingRate, existingName: existing?.name });
+
+      if (!dryRun) {
+        const data = { name, sku, hsnSac, description, quantity: isNaN(quantity) ? 0 : quantity, unit, purchaseRate: isNaN(purchaseRate) ? 0 : purchaseRate, sellingRate: isNaN(sellingRate) ? 0 : sellingRate, gstRate: isNaN(gstRate) ? 18 : gstRate, minimumStock: isNaN(minimumStock) ? 5 : minimumStock };
+        if (existing) {
+          await Product.findByIdAndUpdate(existing._id, data);
+        } else {
+          await Product.create({ ...data, isActive: true });
+          if (data.quantity > 0) {
+            const newProd = await Product.findOne({ sku });
+            if (newProd) {
+              await StockMovement.create({ productId: newProd._id, type: 'IN', quantity: data.quantity, previousQuantity: 0, newQuantity: data.quantity, reason: 'CSV Import', referenceType: 'ADJUSTMENT', createdBy: req.user._id }).catch(() => {});
+            }
+          }
+        }
+      }
+    }
+
+    res.json({
+      success: true,
+      message: dryRun
+        ? `Preview: ${results.newCount} new, ${results.updateCount} updates, ${results.errorCount} errors`
+        : `Import complete: ${results.newCount} created, ${results.updateCount} updated, ${results.errorCount} skipped`,
+      data: results,
+      dryRun,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   getProducts,
   getProduct,
@@ -212,4 +313,5 @@ module.exports = {
   adjustStock,
   getStockMovements,
   getLowStockProducts,
+  importProductsCSV,
 };
