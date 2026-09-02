@@ -415,6 +415,13 @@ const emailInvoice = async (req, res, next) => {
       from: smtp.from || process.env.SMTP_FROM || '',
     };
 
+    if (!smtpConfig.host || !smtpConfig.user || !smtpConfig.password) {
+      return res.status(400).json({
+        success: false,
+        message: 'SMTP email credentials are not configured. Please set SMTP host, user, and app password in Settings.',
+      });
+    }
+
     await sendInvoiceEmail({ invoice, pdfBuffer, smtpConfig });
     await Invoice.findByIdAndUpdate(invoice._id, { emailStatus: 'SENT', emailSentAt: new Date() });
 
