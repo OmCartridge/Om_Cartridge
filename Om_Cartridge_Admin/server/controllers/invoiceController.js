@@ -24,15 +24,55 @@ const validateObjectId = (id, res) => {
 
 /**
  * generateInvoiceNumber — atomic, race-condition-safe using InvoiceCounter.$inc.
+ * Synchronizes with existing invoices so sequence always starts above any existing numbers.
  */
 const generateInvoiceNumber = async (prefix, financialYear) => {
   const counterId = `${prefix}/${financialYear}`;
-  const counter = await InvoiceCounter.findOneAndUpdate(
+
+  // Find the highest sequence number among existing invoices for this prefix/year
+  const pattern = new RegExp(`^${prefix}/(\\d+)/${financialYear}$`);
+  const existingInvoices = await Invoice.find({ invoiceNumber: { $regex: `^${prefix}/\\d+/${financialYear}$` } })
+    .select('invoiceNumber')
+    .lean();
+
+  let maxExisting = 0;
+  for (const inv of existingInvoices) {
+    const match = inv.invoiceNumber?.match(pattern);
+    if (match && match[1]) {
+      const num = parseInt(match[1], 10);
+      if (num > maxExisting) maxExisting = num;
+    }
+  }
+
+  // Ensure InvoiceCounter is at least maxExisting before incrementing
+  let counter = await InvoiceCounter.findById(counterId);
+  if (!counter || counter.sequence < maxExisting) {
+    await InvoiceCounter.findByIdAndUpdate(
+      counterId,
+      { $set: { sequence: maxExisting } },
+      { upsert: true }
+    );
+  }
+
+  // Atomically increment
+  counter = await InvoiceCounter.findOneAndUpdate(
     { _id: counterId },
     { $inc: { sequence: 1 } },
     { upsert: true, new: true }
   );
-  return `${prefix}/${counter.sequence}/${financialYear}`;
+
+  // Fallback safety: ensure candidate doesn't exist in MongoDB
+  let candidate = `${prefix}/${counter.sequence}/${financialYear}`;
+  while (await Invoice.exists({ invoiceNumber: candidate })) {
+    counter = await InvoiceCounter.findOneAndUpdate(
+      { _id: counterId },
+      { $inc: { sequence: 1 } },
+      { new: true }
+    );
+    candidate = `${prefix}/${counter.sequence}/${financialYear}`;
+  }
+
+  return candidate;
 };
 
 // ── GET /api/invoices ─────────────────────────────────────────────────────────
