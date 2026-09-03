@@ -74,6 +74,7 @@ const invoiceSchema = new mongoose.Schema(
     // Transaction type
     isInterState: { type: Boolean, default: false },
     taxMode: { type: String, enum: ['with_tax', 'without_tax'], default: 'with_tax' },
+    businessType: { type: String, enum: ['OM_CARTRIDGE', 'OM_ENTERPRISE'], default: 'OM_ENTERPRISE' },
 
     // Invoice metadata
     paymentTerms: { type: String, default: '' },

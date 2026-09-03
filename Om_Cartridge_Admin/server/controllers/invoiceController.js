@@ -38,10 +38,11 @@ const generateInvoiceNumber = async (prefix, financialYear) => {
 // ── GET /api/invoices ─────────────────────────────────────────────────────────
 const getInvoices = async (req, res, next) => {
   try {
-    const { search, status, customerId, startDate, endDate, page = 1, limit = 20 } = req.query;
+    const { search, status, customerId, businessType, startDate, endDate, page = 1, limit = 20 } = req.query;
 
     const filter = {};
     if (status) filter.status = status;
+    if (businessType) filter.businessType = businessType;
     if (customerId) {
       if (!mongoose.isValidObjectId(customerId)) {
         return res.status(400).json({ success: false, message: 'Invalid customer ID' });
@@ -110,14 +111,17 @@ const createInvoice = async (req, res, next) => {
   try {
     const {
       customerId, invoiceDate, items, isInterState,
-      taxMode,
+      taxMode, businessType,
       paymentTerms, referenceNumber, buyersOrderNumber,
       deliveryNote, dispatchDetails, destination, termsOfDelivery,
       sendEmail,
     } = req.body;
 
-    // Validate taxMode
-    const resolvedTaxMode = taxMode === 'without_tax' ? 'without_tax' : 'with_tax';
+    // Resolve businessType & taxMode: Om Cartridge = without_tax, Om Enterprise = with_tax
+    const resolvedBusinessType = (businessType === 'OM_CARTRIDGE' || taxMode === 'without_tax')
+      ? 'OM_CARTRIDGE'
+      : 'OM_ENTERPRISE';
+    const resolvedTaxMode = resolvedBusinessType === 'OM_CARTRIDGE' ? 'without_tax' : 'with_tax';
 
     // --- Basic validation ---
     if (!customerId || !mongoose.isValidObjectId(customerId)) {
@@ -234,7 +238,7 @@ const createInvoice = async (req, res, next) => {
         invoiceDate: invoiceDate ? new Date(invoiceDate) : new Date(),
         customerId,
         businessDetails: {
-          name: biz.name || 'OM ENTERPRISE',
+          name: resolvedBusinessType === 'OM_CARTRIDGE' ? 'OM CARTRIDGE' : (biz.name || 'OM ENTERPRISE'),
           brandName: biz.brandName || 'OM CARTRIDGE',
           address: biz.address || '10, C-DAC Computer,\nBavla Road,\nSanand, Ahmedabad,\nGujarat',
           gstin: biz.gstin || '24ACWPZ3281G1ZX',
@@ -272,6 +276,7 @@ const createInvoice = async (req, res, next) => {
         taxAmountInWords: calculated.taxAmountInWords,
         isInterState: !!isInterState,
         taxMode: resolvedTaxMode,
+        businessType: resolvedBusinessType,
         paymentTerms: paymentTerms || invoiceSettings.defaultPaymentTerms || '',
         referenceNumber: referenceNumber || '',
         buyersOrderNumber: buyersOrderNumber || '',

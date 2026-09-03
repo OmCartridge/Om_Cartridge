@@ -57,6 +57,11 @@ const InvoiceViewPage = () => {
   const cust = invoice.customerSnapshot || {};
   const bank = invoice.bankDetails || {};
 
+  const isWithoutTax = invoice.businessType === 'OM_CARTRIDGE' || invoice.taxMode === 'without_tax';
+  const displayBizName = isWithoutTax ? 'OM CARTRIDGE' : (biz.name || 'OM ENTERPRISE');
+  const displayBrand = isWithoutTax ? 'Printer & Xerox Cartridge Management' : (biz.brandName || 'OM CARTRIDGE');
+  const invoiceTitle = isWithoutTax ? 'INVOICE' : 'TAX INVOICE';
+
   return (
     <AppLayout title={`Invoice ${invoice.invoiceNumber}`}>
       {/* Success banner for new invoices */}
@@ -78,6 +83,16 @@ const InvoiceViewPage = () => {
       {/* Actions Bar */}
       <div style={{ display: 'flex', gap: '10px', marginBottom: '20px', alignItems: 'center', flexWrap: 'wrap' }}>
         <button className="btn btn-outline btn-sm" onClick={() => navigate('/invoices')}><ArrowLeft size={14} /> Back</button>
+        <span style={{
+          padding: '3px 10px',
+          borderRadius: '99px',
+          fontSize: '11px',
+          fontWeight: 800,
+          background: isWithoutTax ? '#fef3c7' : '#dbeafe',
+          color: isWithoutTax ? '#b45309' : '#1d4ed8',
+        }}>
+          {isWithoutTax ? 'Om Cartridge (Without Tax)' : 'Om Enterprise (Tax Invoice)'}
+        </span>
         <div style={{ flex: 1 }} />
         <button className="btn btn-outline" onClick={printInvoice}><Printer size={15} /> Print</button>
         <button className="btn btn-primary" onClick={downloadPDF}><Download size={15} /> Download PDF</button>
@@ -90,19 +105,35 @@ const InvoiceViewPage = () => {
       <div id="invoice-preview" style={{ background: '#fff', border: '2px solid #222', maxWidth: '820px', margin: '0 auto', fontFamily: 'Arial, sans-serif', fontSize: '11px', color: '#000' }}>
 
         {/* Title */}
-        <div style={{ textAlign: 'center', fontSize: '16px', fontWeight: 'bold', letterSpacing: '3px', borderBottom: '1px solid #000', padding: '8px 0' }}>
-          TAX INVOICE
+        <div style={{
+          textAlign: 'center',
+          fontSize: '16px',
+          fontWeight: 'bold',
+          letterSpacing: '3px',
+          borderBottom: '1px solid #000',
+          padding: '8px 0',
+          background: isWithoutTax ? '#fffbeb' : '#f8fafc',
+          color: isWithoutTax ? '#92400e' : '#15527A',
+        }}>
+          {invoiceTitle}
         </div>
 
         {/* Header - Business Info + Invoice Info */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', borderBottom: '1px solid #000' }}>
-          <div style={{ padding: '10px', borderRight: '1px solid #000' }}>
-            <div style={{ fontSize: '16px', fontWeight: 'bold', color: '#15527A' }}>{biz.name}</div>
-            <div style={{ fontSize: '12px', fontWeight: 'bold', color: '#ED3838', marginBottom: '4px' }}>{biz.brandName}</div>
-            <div style={{ fontSize: '10px', lineHeight: '1.7', whiteSpace: 'pre-line', color: '#333' }}>{biz.address}</div>
-            <div style={{ fontSize: '10px', fontWeight: 'bold', marginTop: '4px' }}>GSTIN/UIN: {biz.gstin}</div>
-            <div style={{ fontSize: '10px' }}>State: {biz.state} | Code: {biz.stateCode}</div>
-            <div style={{ fontSize: '10px', marginTop: '3px' }}>Ph: {biz.phone1} / {biz.phone2}</div>
+          <div style={{ padding: '12px 14px', borderRight: '1px solid #000', display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
+            <div style={{ flexShrink: 0, marginTop: '2px' }}>
+              <OMLogo variant="compact" />
+            </div>
+            <div>
+              <div style={{ fontSize: '16px', fontWeight: 'bold', color: '#15527A' }}>{displayBizName}</div>
+              <div style={{ fontSize: '11px', fontWeight: 'bold', color: '#ED3838', marginBottom: '4px' }}>{displayBrand}</div>
+              <div style={{ fontSize: '10px', lineHeight: '1.6', whiteSpace: 'pre-line', color: '#333' }}>{biz.address}</div>
+              {!isWithoutTax && biz.gstin && (
+                <div style={{ fontSize: '10px', fontWeight: 'bold', marginTop: '4px' }}>GSTIN/UIN: {biz.gstin}</div>
+              )}
+              <div style={{ fontSize: '10px' }}>State: {biz.state} | Code: {biz.stateCode}</div>
+              <div style={{ fontSize: '10px', marginTop: '3px' }}>Ph: {biz.phone1} / {biz.phone2}</div>
+            </div>
           </div>
           <div style={{ padding: '10px' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '10px' }}>
@@ -314,7 +345,7 @@ const InvoiceViewPage = () => {
             <div>Branch &amp; IFSC: {bank.branch} &amp; {bank.ifsc}</div>
           </div>
           <div style={{ padding: '10px', fontSize: '10px', display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
-            <div style={{ fontWeight: 'bold' }}>for {biz.name}</div>
+            <div style={{ fontWeight: 'bold' }}>for {displayBizName}</div>
             <div style={{ flex: 1 }} />
             <div style={{ borderTop: '1px solid #000', paddingTop: '5px', textAlign: 'center' }}>Authorised Signatory</div>
           </div>

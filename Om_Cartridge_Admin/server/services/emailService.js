@@ -1,7 +1,8 @@
 const nodemailer = require('nodemailer');
 
 /**
- * Send invoice email with PDF attachment
+ * Send invoice email with PDF attachment.
+ * Dynamically supports OM CARTRIDGE vs OM ENTERPRISE.
  */
 async function sendInvoiceEmail({ invoice, pdfBuffer, smtpConfig }) {
   const { host, port, user, password, from } = smtpConfig;
@@ -20,11 +21,23 @@ async function sendInvoiceEmail({ invoice, pdfBuffer, smtpConfig }) {
 
   const cust = invoice.customerSnapshot || {};
   const biz = invoice.businessDetails || {};
+  const isWithoutTax = invoice.businessType === 'OM_CARTRIDGE' || invoice.taxMode === 'without_tax';
+
+  const businessName = isWithoutTax
+    ? 'OM CARTRIDGE'
+    : (biz.name || 'OM ENTERPRISE');
+
+  const brandSubtitle = isWithoutTax
+    ? 'Printer & Xerox Cartridge Management'
+    : 'OM CARTRIDGE — Printer & Xerox Cartridge Management';
+
+  const invoiceTypeTitle = isWithoutTax ? 'Invoice' : 'Tax Invoice';
+
   const grandTotal = Number(invoice.grandTotal || 0).toLocaleString('en-IN', {
     minimumFractionDigits: 2,
   });
 
-  const emailSubject = `Tax Invoice - ${biz.name || 'OM ENTERPRISE'} - ${invoice.invoiceNumber}`;
+  const emailSubject = `${invoiceTypeTitle} - ${businessName} - ${invoice.invoiceNumber}`;
 
   const emailBody = `
 <!DOCTYPE html>
@@ -32,12 +45,12 @@ async function sendInvoiceEmail({ invoice, pdfBuffer, smtpConfig }) {
 <head><meta charset="UTF-8"></head>
 <body style="font-family: Arial, sans-serif; font-size: 14px; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
   <div style="border-top: 4px solid #15527A; padding-top: 20px;">
-    <h2 style="color: #15527A; margin: 0 0 5px 0;">OM ENTERPRISE</h2>
-    <p style="color: #ED3838; margin: 0 0 20px 0; font-size: 12px;">OM CARTRIDGE — Printer &amp; Xerox Cartridge Management</p>
+    <h2 style="color: #15527A; margin: 0 0 5px 0;">${businessName}</h2>
+    <p style="color: #ED3838; margin: 0 0 20px 0; font-size: 12px;">${brandSubtitle}</p>
     
     <p>Dear <strong>${cust.name || 'Customer'}</strong>,</p>
     
-    <p>Please find attached your tax invoice <strong>${invoice.invoiceNumber}</strong> from <strong>${biz.name || 'OM ENTERPRISE'}</strong>.</p>
+    <p>Please find attached your ${invoiceTypeTitle.toLowerCase()} <strong>${invoice.invoiceNumber}</strong> from <strong>${businessName}</strong>.</p>
     
     <div style="background: #f7f9fb; border: 1px solid #ddd; border-radius: 6px; padding: 15px; margin: 20px 0;">
       <table style="width: 100%; border-collapse: collapse;">
@@ -61,7 +74,7 @@ async function sendInvoiceEmail({ invoice, pdfBuffer, smtpConfig }) {
     <hr style="border: none; border-top: 1px solid #eee; margin: 20px 0;">
     
     <p style="font-size: 12px; color: #666;">
-      <strong style="color: #15527A;">OM ENTERPRISE</strong> | OM CARTRIDGE<br>
+      <strong style="color: #15527A;">${businessName}</strong><br>
       10, C-DAC Computer, Bavla Road, Sanand, Ahmedabad, Gujarat<br>
       📞 ${biz.phone1 || '70967 06868'} / ${biz.phone2 || '70967 06363'}
     </p>
@@ -69,6 +82,7 @@ async function sendInvoiceEmail({ invoice, pdfBuffer, smtpConfig }) {
 </body>
 </html>`;
 
+  const safeName = (invoice.invoiceNumber || 'invoice').replace(/[/\\:*?"<>|]/g, '-');
   const mailOptions = {
     from: from || user,
     to: cust.email,
@@ -76,7 +90,7 @@ async function sendInvoiceEmail({ invoice, pdfBuffer, smtpConfig }) {
     html: emailBody,
     attachments: [
       {
-        filename: `${invoice.invoiceNumber}.pdf`,
+        filename: `OM-INV-${safeName}.pdf`,
         content: pdfBuffer,
         contentType: 'application/pdf',
       },

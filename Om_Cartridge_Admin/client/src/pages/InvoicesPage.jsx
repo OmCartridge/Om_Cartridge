@@ -124,6 +124,7 @@ const InvoicesPage = () => {
               <thead>
                 <tr>
                   <th>Invoice No.</th>
+                  <th>Business</th>
                   <th>Date</th>
                   <th>Customer</th>
                   <th>Taxable Amt</th>
@@ -135,16 +136,31 @@ const InvoicesPage = () => {
                 </tr>
               </thead>
               <tbody>
-                {invoices.map(inv => (
-                  <tr key={inv._id}>
-                    <td><span className="fw-bold text-navy">{inv.invoiceNumber}</span></td>
-                    <td>{formatDate(inv.invoiceDate)}</td>
-                    <td>{inv.customerSnapshot?.name || inv.customerId?.name || '-'}</td>
-                    <td>₹{fmt(inv.taxableValue)}</td>
-                    <td>₹{fmt(inv.totalTax)}</td>
-                    <td className="fw-bold">₹{fmt(inv.grandTotal)}</td>
-                    <td><StatusBadge status={inv.status} /></td>
-                    <td><EmailBadge status={inv.emailStatus} /></td>
+                {invoices.map(inv => {
+                  const isWithoutTax = inv.businessType === 'OM_CARTRIDGE' || inv.taxMode === 'without_tax';
+                  return (
+                    <tr key={inv._id}>
+                      <td><span className="fw-bold text-navy">{inv.invoiceNumber}</span></td>
+                      <td>
+                        <span style={{
+                          padding: '2px 8px',
+                          borderRadius: '4px',
+                          fontSize: '11px',
+                          fontWeight: 700,
+                          background: isWithoutTax ? '#fef3c7' : '#dbeafe',
+                          color: isWithoutTax ? '#b45309' : '#1d4ed8',
+                          whiteSpace: 'nowrap',
+                        }}>
+                          {isWithoutTax ? 'Om Cartridge' : 'Om Enterprise'}
+                        </span>
+                      </td>
+                      <td>{formatDate(inv.invoiceDate)}</td>
+                      <td>{inv.customerSnapshot?.name || inv.customerId?.name || '-'}</td>
+                      <td>₹{fmt(inv.taxableValue)}</td>
+                      <td>₹{fmt(inv.totalTax)}</td>
+                      <td className="fw-bold">₹{fmt(inv.grandTotal)}</td>
+                      <td><StatusBadge status={inv.status} /></td>
+                      <td><EmailBadge status={inv.emailStatus} /></td>
                     <td>
                       <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
                         <button className="btn btn-outline btn-sm" onClick={() => navigate(`/invoices/${inv._id}`)}>View</button>
@@ -159,8 +175,9 @@ const InvoicesPage = () => {
                         )}
                       </div>
                     </td>
-                  </tr>
-                ))}
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           )}
