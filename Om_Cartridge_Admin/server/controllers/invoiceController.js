@@ -1,35 +1,53 @@
+const mongoose = require('mongoose');
 const Invoice = require('../models/Invoice');
 const Product = require('../models/Product');
 const Customer = require('../models/Customer');
 const StockMovement = require('../models/StockMovement');
 const Settings = require('../models/Settings');
+const InvoiceCounter = require('../models/InvoiceCounter');
 const { calculateInvoiceTotals, getFinancialYear } = require('../utils/invoiceUtils');
 const { generateInvoicePDF } = require('../services/pdfService');
 const { sendInvoiceEmail } = require('../services/emailService');
 
-// Generate invoice number: OM/1/2026-27
-const generateInvoiceNumber = async (prefix, financialYear) => {
-  const pattern = new RegExp(`^${prefix}/\\d+/${financialYear}$`);
-  const lastInvoice = await Invoice.findOne({ invoiceNumber: { $regex: pattern } })
-    .sort({ createdAt: -1 })
-    .lean();
+// ── Helpers ───────────────────────────────────────────────────────────────────
 
-  let nextNum = 1;
-  if (lastInvoice) {
-    const parts = lastInvoice.invoiceNumber.split('/');
-    nextNum = parseInt(parts[1]) + 1;
+/**
+ * validateObjectId — returns 400 if id is not a valid MongoDB ObjectId.
+ */
+const validateObjectId = (id, res) => {
+  if (!mongoose.isValidObjectId(id)) {
+    res.status(400).json({ success: false, message: 'Invalid ID format' });
+    return false;
   }
-  return `${prefix}/${nextNum}/${financialYear}`;
+  return true;
 };
 
-// GET /api/invoices
+/**
+ * generateInvoiceNumber — atomic, race-condition-safe using InvoiceCounter.$inc.
+ */
+const generateInvoiceNumber = async (prefix, financialYear) => {
+  const counterId = `${prefix}/${financialYear}`;
+  const counter = await InvoiceCounter.findOneAndUpdate(
+    { _id: counterId },
+    { $inc: { sequence: 1 } },
+    { upsert: true, new: true }
+  );
+  return `${prefix}/${counter.sequence}/${financialYear}`;
+};
+
+// ── GET /api/invoices ─────────────────────────────────────────────────────────
 const getInvoices = async (req, res, next) => {
   try {
     const { search, status, customerId, startDate, endDate, page = 1, limit = 20 } = req.query;
 
     const filter = {};
     if (status) filter.status = status;
-    if (customerId) filter.customerId = customerId;
+    if (customerId) {
+      if (!mongoose.isValidObjectId(customerId)) {
+        return res.status(400).json({ success: false, message: 'Invalid customer ID' });
+      }
+      filter.customerId = customerId;
+    }
     if (startDate || endDate) {
       filter.invoiceDate = {};
       if (startDate) filter.invoiceDate.$gte = new Date(startDate);
@@ -38,18 +56,21 @@ const getInvoices = async (req, res, next) => {
 
     if (search) {
       filter.$or = [
-        { invoiceNumber: { $regex: search, $options: 'i' } },
-        { 'customerSnapshot.name': { $regex: search, $options: 'i' } },
+        { invoiceNumber: { $regex: search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), $options: 'i' } },
+        { 'customerSnapshot.name': { $regex: search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), $options: 'i' } },
       ];
     }
 
-    const skip = (parseInt(page) - 1) * parseInt(limit);
+    const pageNum = Math.max(1, parseInt(page) || 1);
+    const limitNum = Math.min(100, Math.max(1, parseInt(limit) || 20));
+    const skip = (pageNum - 1) * limitNum;
+
     const [invoices, total] = await Promise.all([
       Invoice.find(filter)
         .populate('customerId', 'name email phone')
         .sort({ createdAt: -1 })
         .skip(skip)
-        .limit(parseInt(limit))
+        .limit(limitNum)
         .lean(),
       Invoice.countDocuments(filter),
     ]);
@@ -59,9 +80,9 @@ const getInvoices = async (req, res, next) => {
       data: invoices,
       pagination: {
         total,
-        page: parseInt(page),
-        limit: parseInt(limit),
-        pages: Math.ceil(total / parseInt(limit)),
+        page: pageNum,
+        limit: limitNum,
+        pages: Math.ceil(total / limitNum),
       },
     });
   } catch (error) {
@@ -69,9 +90,11 @@ const getInvoices = async (req, res, next) => {
   }
 };
 
-// GET /api/invoices/:id
+// ── GET /api/invoices/:id ─────────────────────────────────────────────────────
 const getInvoice = async (req, res, next) => {
   try {
+    if (!validateObjectId(req.params.id, res)) return;
+
     const invoice = await Invoice.findById(req.params.id)
       .populate('customerId', 'name email phone gstin address state stateCode')
       .lean();
@@ -82,11 +105,8 @@ const getInvoice = async (req, res, next) => {
   }
 };
 
-// POST /api/invoices — NO TRANSACTIONS (standalone MongoDB compatible)
+// ── POST /api/invoices ────────────────────────────────────────────────────────
 const createInvoice = async (req, res, next) => {
-  // Track stock deductions so we can roll back on error
-  const stockDeductions = []; // { productId, qty }
-
   try {
     const {
       customerId, invoiceDate, items, isInterState,
@@ -100,9 +120,15 @@ const createInvoice = async (req, res, next) => {
     const resolvedTaxMode = taxMode === 'without_tax' ? 'without_tax' : 'with_tax';
 
     // --- Basic validation ---
-    if (!customerId) return res.status(400).json({ success: false, message: 'Customer is required' });
-    if (!items || !Array.isArray(items) || items.length === 0)
+    if (!customerId || !mongoose.isValidObjectId(customerId)) {
+      return res.status(400).json({ success: false, message: 'Valid customer ID is required' });
+    }
+    if (!items || !Array.isArray(items) || items.length === 0) {
       return res.status(400).json({ success: false, message: 'Invoice must contain at least one item' });
+    }
+    if (items.length > 100) {
+      return res.status(400).json({ success: false, message: 'Invoice cannot have more than 100 line items' });
+    }
 
     // --- Load customer ---
     const customer = await Customer.findById(customerId);
@@ -117,23 +143,30 @@ const createInvoice = async (req, res, next) => {
     // --- Validate items & check stock BEFORE any modification ---
     const processedItems = [];
     for (const item of items) {
-      if (!item.productId)
-        return res.status(400).json({ success: false, message: 'Each item must have a product' });
-      if (!item.quantity || Number(item.quantity) <= 0)
-        return res.status(400).json({ success: false, message: 'Quantity must be greater than 0' });
-      if (item.rate === undefined || item.rate < 0)
-        return res.status(400).json({ success: false, message: 'Rate cannot be negative' });
+      if (!item.productId || !mongoose.isValidObjectId(item.productId)) {
+        return res.status(400).json({ success: false, message: 'Each item must have a valid product ID' });
+      }
+
+      const qty = Number(item.quantity);
+      const rate = Number(item.rate);
+
+      if (!Number.isFinite(qty) || qty <= 0) {
+        return res.status(400).json({ success: false, message: 'Quantity must be a positive number' });
+      }
+      if (!Number.isFinite(rate) || rate < 0) {
+        return res.status(400).json({ success: false, message: 'Rate cannot be negative or invalid' });
+      }
+      if (qty > 99999) {
+        return res.status(400).json({ success: false, message: 'Quantity exceeds allowed maximum' });
+      }
 
       const product = await Product.findById(item.productId);
-      if (!product)
+      if (!product) {
         return res.status(404).json({ success: false, message: `Product not found: ${item.productId}` });
-      if (!product.isActive)
+      }
+      if (!product.isActive) {
         return res.status(400).json({ success: false, message: `Product "${product.name}" is inactive` });
-      if (product.quantity < Number(item.quantity))
-        return res.status(400).json({
-          success: false,
-          message: `Insufficient stock for "${product.name}". Available: ${product.quantity} ${product.unit}`,
-        });
+      }
 
       processedItems.push({
         product,
@@ -141,36 +174,56 @@ const createInvoice = async (req, res, next) => {
           productId: product._id,
           description: item.description || product.name,
           hsnSac: item.hsnSac || product.hsnSac || '',
-          quantity: Number(item.quantity),
+          quantity: qty,
           unit: item.unit || product.unit || 'PCS',
-          rate: Number(item.rate),
+          rate,
           gstRate: item.gstRate !== undefined ? Number(item.gstRate) : product.gstRate,
-          // Discount fields
           discountType: item.discountType || 'none',
           discountValue: Number(item.discountValue) || 0,
         },
       });
     }
 
-    // --- Calculate totals on backend ---
+    // --- Calculate totals on backend (never trust client totals) ---
     const calculated = calculateInvoiceTotals(
       processedItems.map((p) => p.itemData),
       !!isInterState,
       resolvedTaxMode
     );
 
-    // --- Generate invoice number ---
+    // --- Generate invoice number (atomic) ---
     const financialYear = getFinancialYear(invoiceDate ? new Date(invoiceDate) : new Date());
     const prefix = invoiceSettings.prefix || biz.prefix || 'OM';
     const invoiceNumber = await generateInvoiceNumber(prefix, financialYear);
 
-    // --- Deduct stock first (before creating invoice) ---
+    // --- Deduct stock atomically (each item uses conditional $inc with $gte guard) ---
+    const stockResults = [];
     for (const { product, itemData } of processedItems) {
-      const prevQty = product.quantity;
-      const newQty = prevQty - itemData.quantity;
+      const updated = await Product.findOneAndUpdate(
+        { _id: product._id, quantity: { $gte: itemData.quantity } },
+        { $inc: { quantity: -itemData.quantity } },
+        { new: true }
+      );
 
-      await Product.findByIdAndUpdate(product._id, { quantity: newQty });
-      stockDeductions.push({ productId: product._id, qty: itemData.quantity, prevQty });
+      if (!updated) {
+        // Rollback already-decremented items
+        for (const done of stockResults) {
+          await Product.findByIdAndUpdate(done.productId, { $inc: { quantity: done.qty } }).catch(() => {});
+        }
+        // Decrement InvoiceCounter to reclaim the sequence number
+        await InvoiceCounter.findByIdAndUpdate(
+          `${prefix}/${financialYear}`,
+          { $inc: { sequence: -1 } }
+        ).catch(() => {});
+
+        const fresh = await Product.findById(product._id).lean();
+        return res.status(409).json({
+          success: false,
+          message: `Insufficient stock for "${product.name}". Available: ${fresh?.quantity ?? 0} ${product.unit}`,
+        });
+      }
+
+      stockResults.push({ productId: product._id, qty: itemData.quantity, prevQty: updated.quantity + itemData.quantity });
     }
 
     // --- Create invoice document ---
@@ -234,20 +287,22 @@ const createInvoice = async (req, res, next) => {
         createdBy: req.user._id,
       });
     } catch (invoiceError) {
-      // Roll back stock deductions if invoice creation failed
+      // Roll back stock deductions
       console.error('Invoice creation failed, rolling back stock:', invoiceError.message);
-      for (const { productId, prevQty } of stockDeductions) {
-        await Product.findByIdAndUpdate(productId, { quantity: prevQty }).catch(() => {});
+      for (const { productId, qty } of stockResults) {
+        await Product.findByIdAndUpdate(productId, { $inc: { quantity: qty } }).catch(() => {});
       }
+      await InvoiceCounter.findByIdAndUpdate(
+        `${prefix}/${financialYear}`,
+        { $inc: { sequence: -1 } }
+      ).catch(() => {});
       throw invoiceError;
     }
 
     // --- Create StockMovement records ---
     for (const { product, itemData } of processedItems) {
-      const deduction = stockDeductions.find(
-        (d) => d.productId.toString() === product._id.toString()
-      );
-      const prevQty = deduction ? deduction.prevQty : product.quantity + itemData.quantity;
+      const result = stockResults.find((d) => d.productId.toString() === product._id.toString());
+      const prevQty = result ? result.prevQty : product.quantity + itemData.quantity;
       const newQty = prevQty - itemData.quantity;
 
       await StockMovement.create({
@@ -263,7 +318,7 @@ const createInvoice = async (req, res, next) => {
       }).catch((err) => console.error('StockMovement create error:', err.message));
     }
 
-    // --- Generate PDF buffer (in-memory, no disk write) ---
+    // --- Generate PDF buffer (in-memory) ---
     let pdfBuffer = null;
     try {
       pdfBuffer = await generateInvoicePDF(invoice.toObject());
@@ -284,7 +339,7 @@ const createInvoice = async (req, res, next) => {
           from: smtp.from || process.env.SMTP_FROM || '',
         };
 
-        if (pdfBuffer) {
+        if (pdfBuffer && smtpConfig.host && smtpConfig.user && smtpConfig.password) {
           await sendInvoiceEmail({ invoice: invoice.toObject(), pdfBuffer, smtpConfig });
           emailStatus = 'SENT';
         } else {
@@ -321,15 +376,18 @@ const createInvoice = async (req, res, next) => {
   }
 };
 
-// POST /api/invoices/:id/cancel — restore stock without transactions
+// ── POST /api/invoices/:id/cancel ─────────────────────────────────────────────
 const cancelInvoice = async (req, res, next) => {
   try {
+    if (!validateObjectId(req.params.id, res)) return;
+
     const invoice = await Invoice.findById(req.params.id);
     if (!invoice) return res.status(404).json({ success: false, message: 'Invoice not found' });
-    if (invoice.status === 'CANCELLED')
+    if (invoice.status === 'CANCELLED') {
       return res.status(400).json({ success: false, message: 'Invoice is already cancelled' });
+    }
 
-    // Restore stock for each item
+    // Restore stock for each item (atomic increment)
     for (const item of invoice.items) {
       if (!item.productId) continue;
       const product = await Product.findById(item.productId);
@@ -338,7 +396,7 @@ const cancelInvoice = async (req, res, next) => {
       const prevQty = product.quantity;
       const newQty = prevQty + item.quantity;
 
-      await Product.findByIdAndUpdate(product._id, { quantity: newQty });
+      await Product.findByIdAndUpdate(product._id, { $inc: { quantity: item.quantity } });
 
       await StockMovement.create({
         productId: product._id,
@@ -366,23 +424,27 @@ const cancelInvoice = async (req, res, next) => {
   }
 };
 
-// GET /api/invoices/:id/pdf  (no auth — public so browsers can download directly)
+// ── GET /api/invoices/:id/pdf ─────────────────────────────────────────────────
+// Auth required (protect middleware in routes); returns 404 not 403 to avoid
+// revealing whether other users' invoice IDs exist.
 const downloadInvoicePDF = async (req, res, next) => {
   try {
+    if (!validateObjectId(req.params.id, res)) return;
+
     const invoice = await Invoice.findById(req.params.id).lean();
-    if (!invoice) return res.status(404).json({ success: false, message: 'Invoice not found' });
+    if (!invoice) {
+      return res.status(404).json({ success: false, message: 'Invoice not found' });
+    }
 
     let pdfBuffer;
     try {
       pdfBuffer = await generateInvoicePDF(invoice);
     } catch (err) {
       console.error('PDF generation error:', err.message);
-      return res
-        .status(500)
-        .json({ success: false, message: 'PDF generation failed: ' + err.message });
+      return res.status(500).json({ success: false, message: 'PDF generation failed' });
     }
 
-    const safeName = (invoice.invoiceNumber || 'invoice').replace(/[\/\\:*?"<>|]/g, '-');
+    const safeName = (invoice.invoiceNumber || 'invoice').replace(/[/\\:*?"<>|]/g, '-');
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `attachment; filename="OM-INV-${safeName}.pdf"`);
     res.setHeader('Content-Length', pdfBuffer.length);
@@ -392,16 +454,18 @@ const downloadInvoicePDF = async (req, res, next) => {
   }
 };
 
-
-// POST /api/invoices/:id/email
+// ── POST /api/invoices/:id/email ──────────────────────────────────────────────
 const emailInvoice = async (req, res, next) => {
   try {
+    if (!validateObjectId(req.params.id, res)) return;
+
     const invoice = await Invoice.findById(req.params.id).lean();
     if (!invoice) return res.status(404).json({ success: false, message: 'Invoice not found' });
 
     const customerEmail = invoice.customerSnapshot?.email;
-    if (!customerEmail)
+    if (!customerEmail) {
       return res.status(400).json({ success: false, message: 'Customer email not available' });
+    }
 
     const pdfBuffer = await generateInvoicePDF(invoice);
 

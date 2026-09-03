@@ -1,9 +1,12 @@
 const express = require('express');
 const router = express.Router();
 const { getSettings, updateSettings } = require('../controllers/settingsController');
-const { protect } = require('../middleware/auth');
+const { protect, requireAdmin } = require('../middleware/auth');
 
+// Read settings — any authenticated user
 router.get('/', protect, getSettings);
-router.put('/', protect, updateSettings);
+
+// Update settings — admin only (bank, SMTP, business details)
+router.put('/', protect, requireAdmin, updateSettings);
 
 module.exports = router;

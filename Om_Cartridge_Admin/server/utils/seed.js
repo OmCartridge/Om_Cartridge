@@ -8,10 +8,18 @@ const StockMovement = require('../models/StockMovement');
 
 const seedData = async () => {
   try {
+    // SECURITY: Require ADMIN_PASSWORD from env — no hardcoded fallback
+    if (!process.env.ADMIN_PASSWORD) {
+      throw new Error(
+        'ADMIN_PASSWORD environment variable is required. ' +
+        'Set it in your .env file before running seed.'
+      );
+    }
+
     await mongoose.connect(process.env.MONGO_URI);
     console.log('✅ Connected to MongoDB');
 
-    // Clear existing data (optional - comment out to preserve data)
+    // Clear existing data
     await User.deleteMany({});
     await Product.deleteMany({});
     await Customer.deleteMany({});
@@ -20,13 +28,15 @@ const seedData = async () => {
     console.log('🗑️  Cleared existing data');
 
     // --- Create Admin User ---
+    const adminEmail = process.env.ADMIN_EMAIL || 'admin@omcartridge.local';
     const adminUser = await User.create({
       name: 'Admin',
-      email: process.env.ADMIN_EMAIL || 'admin@omcartridge.local',
-      password: process.env.ADMIN_PASSWORD || 'Admin@123',
+      email: adminEmail,
+      password: process.env.ADMIN_PASSWORD, // Required — no fallback
       role: 'admin',
     });
     console.log(`✅ Admin user created: ${adminUser.email}`);
+    // SECURITY: Never log the password
 
     // --- Create Default Settings ---
     await Settings.create({
@@ -111,7 +121,7 @@ const seedData = async () => {
       },
     ]);
 
-    console.log(`✅ Products created:`);
+    console.log('✅ Products created:');
     console.log(`   - ${product1.name} (Qty: 50)`);
     console.log(`   - ${product2.name} (Qty: 30)`);
 
@@ -132,7 +142,7 @@ const seedData = async () => {
     console.log('\n🎉 Seed completed successfully!');
     console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
     console.log(`📧 Admin Email: ${adminUser.email}`);
-    console.log(`🔑 Admin Password: ${process.env.ADMIN_PASSWORD || 'Admin@123'}`);
+    console.log('🔑 Admin Password: [set via ADMIN_PASSWORD env var]');
     console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
 
     process.exit(0);
