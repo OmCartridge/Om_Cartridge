@@ -1,4 +1,5 @@
 const PDFDocument = require('pdfkit');
+const logoBase64 = require('./logoBase64');
 
 const fmt = (n) =>
   Number(n || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -9,19 +10,21 @@ const formatDate = (d) =>
 /**
  * Generate PDF buffer from invoice data using pdfkit.
  * Exact 1-to-1 visual mirror of the Master InvoiceTemplate from the Viewing Page:
+ *  - Includes OM Cartridge brand logo
  *  - Outer border
- *  - Header with Logo / Business details and Metadata table
+ *  - Header with Logo + Business details and Metadata table
  *  - Consignee (Ship to) / Buyer (Bill to) 2-column split
- *  - Items table with full borders
- *  - Totals box with words, E. & O.E., subtotal, discounts, tax, grand total
- *  - GST HSN/SAC summary table (for with_tax) or Without-Tax banner
+ *  - Items table with full cell borders
+ *  - Totals box with words, E. & O.E., subtotal, discount, round off, grand total
+ *  - IF WITH TAX: Full tax description (CGST/SGST/IGST and HSN/SAC breakdown table)
+ *  - IF WITHOUT TAX: NOTHING about tax (no "Without Tax", no "Tax 0.00", no tax banner)
  *  - Declaration, Bank details, and Authorised Signatory box
  *  - Computer Generated Invoice footer
  */
 async function generateInvoicePDF(invoice) {
   return new Promise((resolve, reject) => {
     try {
-      // Standard A4: 595.28 x 841.89 points. Margin 28pt gives width 539pt, height 785pt.
+      // Standard A4: 595.28 x 841.89 points. Margin 28pt gives width 539.28pt, height 785.89pt.
       const doc = new PDFDocument({ size: 'A4', margin: 28 });
       const buffers = [];
 
@@ -40,7 +43,7 @@ async function generateInvoicePDF(invoice) {
 
       const displayBrand = isWithoutTax
         ? 'Printer & Xerox Cartridge Management'
-        : (biz.brandName || 'OM CARTRIDGE — Printer & Xerox Cartridge Management');
+        : (biz.brandName || 'OM CARTRIDGE');
 
       const invoiceTitle = isWithoutTax ? 'INVOICE' : 'TAX INVOICE';
 
@@ -52,41 +55,57 @@ async function generateInvoicePDF(invoice) {
 
       // ── 1. TITLE BANNER ──────────────────────────────────────────────────────────
       const titleH = 22;
-      doc.rect(boxX, curY, boxW, titleH).fill(isWithoutTax ? '#FFFBEB' : '#F1F5F9');
+      doc.rect(boxX, curY, boxW, titleH).fill('#F8FAFC');
       doc.rect(boxX, curY, boxW, titleH).stroke('#000000');
-      doc.font('Helvetica-Bold').fontSize(12).fillColor(isWithoutTax ? '#92400E' : '#15527A');
+      doc.font('Helvetica-Bold').fontSize(12).fillColor('#15527A');
       doc.text(invoiceTitle, boxX, curY + 5, { width: boxW, align: 'center', characterSpacing: 2 });
       curY += titleH;
 
-      // ── 2. HEADER: BUSINESS INFO (LEFT) + INVOICE METADATA (RIGHT) ───────────────
+      // ── 2. HEADER: BUSINESS INFO + LOGO (LEFT) & INVOICE METADATA (RIGHT) ─────────
       const colW = boxW / 2;
-      const headerH = 100;
+      const headerH = 102;
       doc.rect(boxX, curY, boxW, headerH).stroke('#000000');
       doc.moveTo(boxX + colW, curY).lineTo(boxX + colW, curY + headerH).stroke('#000000');
 
-      // Left Column: Business Info
+      // Draw Brand Logo on Left
+      let textLeftX = boxX + 8;
+      try {
+        if (logoBase64) {
+          const logoBuffer = Buffer.from(logoBase64, 'base64');
+          doc.image(logoBuffer, boxX + 8, curY + 8, { width: 36, height: 36 });
+          textLeftX = boxX + 48; // offset text to right of logo
+        }
+      } catch (err) {
+        console.error('PDF logo render warning:', err.message);
+      }
+
+      // Left Column: Business Info beside Logo
       doc.font('Helvetica-Bold').fontSize(13).fillColor('#15527A');
-      doc.text(displayBizName, boxX + 8, curY + 8, { width: colW - 16 });
+      doc.text(displayBizName, textLeftX, curY + 8, { width: colW - (textLeftX - boxX) - 6 });
 
       doc.font('Helvetica-Bold').fontSize(8.5).fillColor('#ED3838');
-      doc.text(displayBrand, boxX + 8, curY + 24, { width: colW - 16 });
+      doc.text(displayBrand, textLeftX, curY + 23, { width: colW - (textLeftX - boxX) - 6 });
 
       doc.font('Helvetica').fontSize(7.5).fillColor('#333333');
       const cleanAddr = (biz.address || '10, C-DAC Computer, Bavla Road, Sanand, Ahmedabad').replace(/\n/g, ', ');
-      doc.text(cleanAddr, boxX + 8, curY + 36, { width: colW - 16 });
+      doc.text(cleanAddr, textLeftX, curY + 34, { width: colW - (textLeftX - boxX) - 6, height: 20 });
 
+      let bizExtraY = curY + 54;
       if (!isWithoutTax && biz.gstin) {
-        doc.font('Helvetica-Bold').text(`GSTIN/UIN: ${biz.gstin}`, boxX + 8, curY + 54);
+        doc.font('Helvetica-Bold').fontSize(7.5).fillColor('#000000').text(`GSTIN/UIN: ${biz.gstin}`, textLeftX, bizExtraY);
+        bizExtraY += 11;
       }
-      doc.font('Helvetica').text(`State: ${biz.state || 'Gujarat'} | Code: ${biz.stateCode || '24'}`, boxX + 8, curY + 66);
-      doc.text(`Ph: ${biz.phone1 || '70967 06868'} / ${biz.phone2 || '70967 06363'}`, boxX + 8, curY + 78);
+      doc.font('Helvetica').fontSize(7.5).fillColor('#333333');
+      doc.text(`State: ${biz.state || 'Gujarat'} | Code: ${biz.stateCode || '24'}`, textLeftX, bizExtraY);
+      bizExtraY += 11;
+      doc.text(`Ph: ${biz.phone1 || '70967 06868'} / ${biz.phone2 || '70967 06363'}`, textLeftX, bizExtraY);
 
       // Right Column: Invoice Metadata Table
       const metaRows = [
         ['Invoice No.', invoice.invoiceNumber || ''],
         ['Dated', formatDate(invoice.invoiceDate)],
         ['Delivery Note', invoice.deliveryNote || ''],
-        ['Payment Terms', invoice.paymentTerms || 'Due on Receipt'],
+        ['Payment Terms', invoice.paymentTerms || ''],
         ['Reference No.', invoice.referenceNumber || ''],
         ["Buyer's Order No.", invoice.buyersOrderNumber || ''],
         ['Dispatch Details', invoice.dispatchDetails || ''],
@@ -127,40 +146,41 @@ async function generateInvoicePDF(invoice) {
         const custAddr = (cust.address || '').replace(/\n/g, ', ');
         doc.text(custAddr || '-', cX, curY + 17, { width: colW - 16, height: 16 });
 
-        if (cust.gstin) {
-          doc.text(`GSTIN/UIN: ${cust.gstin}`, cX, curY + 34);
+        let custExtraY = curY + 33;
+        if (!isWithoutTax && cust.gstin) {
+          doc.text(`GSTIN/UIN: ${cust.gstin}`, cX, custExtraY);
+          custExtraY += 10;
         }
-        doc.text(`State: ${cust.state || 'Gujarat'} | Code: ${cust.stateCode || '24'}`, cX, curY + (cust.gstin ? 44 : 34));
+        doc.text(`State: ${cust.state || 'Gujarat'} | Code: ${cust.stateCode || '24'}`, cX, custExtraY);
+        custExtraY += 10;
         if (cust.phone) {
-          doc.text(`Ph: ${cust.phone}`, cX, curY + (cust.gstin ? 54 : 44));
+          doc.text(`Ph: ${cust.phone}`, cX, custExtraY);
         }
       });
 
       curY += custBoxH;
 
       // ── 5. ITEMS TABLE ───────────────────────────────────────────────────────────
-      // Column widths totaling 539.28pt:
-      // Sl: 24, Desc: 180, HSN: 55, Qty: 40, Unit: 38, Rate: 58, Disc: 60, Amt: 84.28
       const hasDiscount = (invoice.totalDiscount || 0) > 0;
       const cols = hasDiscount
         ? [
             { id: 'sl', label: 'Sl No.', w: 28, align: 'center' },
             { id: 'desc', label: 'Description of Goods', w: 175, align: 'left' },
             { id: 'hsn', label: 'HSN/SAC', w: 55, align: 'center' },
-            { id: 'qty', label: 'Qty', w: 40, align: 'center' },
-            { id: 'unit', label: 'Unit', w: 35, align: 'center' },
-            { id: 'rate', label: 'Rate (₹)', w: 58, align: 'right' },
+            { id: 'qty', label: 'Quantity', w: 42, align: 'center' },
+            { id: 'unit', label: 'Unit', w: 33, align: 'center' },
+            { id: 'rate', label: 'Rate', w: 58, align: 'right' },
             { id: 'disc', label: 'Discount', w: 60, align: 'right' },
-            { id: 'amt', label: 'Amount (₹)', w: 88.28, align: 'right' },
+            { id: 'amt', label: 'Amount', w: 88.28, align: 'right' },
           ]
         : [
             { id: 'sl', label: 'Sl No.', w: 28, align: 'center' },
             { id: 'desc', label: 'Description of Goods', w: 215, align: 'left' },
             { id: 'hsn', label: 'HSN/SAC', w: 60, align: 'center' },
-            { id: 'qty', label: 'Qty', w: 45, align: 'center' },
+            { id: 'qty', label: 'Quantity', w: 45, align: 'center' },
             { id: 'unit', label: 'Unit', w: 40, align: 'center' },
-            { id: 'rate', label: 'Rate (₹)', w: 65, align: 'right' },
-            { id: 'amt', label: 'Amount (₹)', w: 86.28, align: 'right' },
+            { id: 'rate', label: 'Rate', w: 65, align: 'right' },
+            { id: 'amt', label: 'Amount', w: 86.28, align: 'right' },
           ];
 
       const thH = 16;
@@ -211,13 +231,24 @@ async function generateInvoicePDF(invoice) {
         curY += rowH;
       });
 
+      // Blank spacer row (like viewing page 36px)
+      const spacerH = isWithoutTax ? 36 : 24;
+      doc.rect(boxX, curY, boxW, spacerH).stroke('#CCCCCC');
+      colX = boxX;
+      cols.forEach((c) => {
+        colX += c.w;
+        if (colX < boxX + boxW) {
+          doc.moveTo(colX, curY).lineTo(colX, curY + spacerH).stroke('#CCCCCC');
+        }
+      });
+      curY += spacerH;
+
       // Table Total Row
       const totalRowH = 16;
       doc.rect(boxX, curY, boxW, totalRowH).fill('#F9F9F9');
       doc.rect(boxX, curY, boxW, totalRowH).stroke('#000000');
 
       doc.font('Helvetica-Bold').fontSize(7.5).fillColor('#000000');
-      // "Total" spanning across first 2 columns
       const spanW = cols[0].w + cols[1].w + (cols[2] ? cols[2].w : 0);
       doc.text('Total', boxX + 4, curY + 4, { width: spanW - 8, align: 'right' });
 
@@ -231,7 +262,7 @@ async function generateInvoicePDF(invoice) {
       }
       doc.text(totalQty.toString(), qX + 2, curY + 4, { width: qtyCol.w - 4, align: 'center' });
 
-      // Total taxable / amount
+      // Total taxable value / amount
       doc.text(`₹${fmt(invoice.taxableValue)}`, boxX + boxW - cols[cols.length - 1].w - 4, curY + 4, {
         width: cols[cols.length - 1].w,
         align: 'right',
@@ -240,24 +271,19 @@ async function generateInvoicePDF(invoice) {
       curY += totalRowH;
 
       // ── 6. TOTALS SECTION (SPLIT IN HALF) ────────────────────────────────────────
-      const totalsH = 75;
+      // For Without Tax: compact totals box (no tax rows, no without-tax badge)
+      const totalsH = isWithoutTax ? 56 : 74;
       doc.rect(boxX, curY, boxW, totalsH).stroke('#000000');
       doc.moveTo(boxX + colW, curY).lineTo(boxX + colW, curY + totalsH).stroke('#000000');
 
-      // Left: Words & Without Tax Badge
+      // Left: Amount in Words & E. & O.E. (No without tax banner!)
       doc.font('Helvetica-Bold').fontSize(7.5).fillColor('#000000');
       doc.text('Amount Chargeable (in words):', boxX + 8, curY + 6);
-      doc.font('Helvetica-Oblique').fontSize(7).fillColor('#333333');
+      doc.font('Helvetica-Oblique').fontSize(7.5).fillColor('#333333');
       doc.text(invoice.amountInWords || '', boxX + 8, curY + 18, { width: colW - 16 });
-      doc.font('Helvetica').fontSize(6.5).fillColor('#666666').text('E. & O.E.', boxX + 8, curY + 45);
+      doc.font('Helvetica').fontSize(6.5).fillColor('#666666').text('E. & O.E.', boxX + 8, curY + (isWithoutTax ? 38 : 48));
 
-      if (isWithoutTax) {
-        doc.rect(boxX + 8, curY + 56, 125, 13).fill('#FFFBEB');
-        doc.rect(boxX + 8, curY + 56, 125, 13).stroke('#FDE68A');
-        doc.font('Helvetica-Bold').fontSize(6.5).fillColor('#92400E').text('⚠ WITHOUT TAX INVOICE', boxX + 12, curY + 59);
-      }
-
-      // Right: Detailed Totals
+      // Right: Calculations
       let totY = curY + 4;
       const rightRows = [];
       if (hasDiscount) {
@@ -266,6 +292,7 @@ async function generateInvoicePDF(invoice) {
       }
       rightRows.push([hasDiscount ? 'Taxable Value' : 'Subtotal', `₹${fmt(invoice.taxableValue)}`]);
 
+      // ONLY IF WITH TAX: show CGST, SGST, IGST, Total Tax. IF WITHOUT TAX: NOTHING!
       if (!isWithoutTax) {
         if (!invoice.isInterState) {
           rightRows.push(['CGST', `₹${fmt(invoice.cgst)}`]);
@@ -274,8 +301,6 @@ async function generateInvoicePDF(invoice) {
           rightRows.push(['IGST', `₹${fmt(invoice.igst)}`]);
         }
         rightRows.push(['Total Tax', `₹${fmt(invoice.totalTax)}`]);
-      } else {
-        rightRows.push(['Tax (Without Tax Mode)', '₹0.00']);
       }
 
       const roff = invoice.roundOff || 0;
@@ -296,7 +321,7 @@ async function generateInvoicePDF(invoice) {
 
       curY += totalsH;
 
-      // ── 7. GST SUMMARY (FOR WITH TAX) OR BANNER (FOR WITHOUT TAX) ─────────────────
+      // ── 7. GST SUMMARY: ONLY IF WITH TAX (IF WITHOUT TAX: NOTHING AT ALL) ──────────
       if (!isWithoutTax) {
         const gstH = 42;
         doc.rect(boxX, curY, boxW, gstH).stroke('#000000');
@@ -365,18 +390,8 @@ async function generateInvoicePDF(invoice) {
         });
 
         curY += gstH;
-      } else {
-        const noTaxH = 16;
-        doc.rect(boxX, curY, boxW, noTaxH).fill('#FFFBEB');
-        doc.rect(boxX, curY, boxW, noTaxH).stroke('#000000');
-        doc.font('Helvetica-Bold').fontSize(7.5).fillColor('#92400E');
-        doc.text(
-          `⚠ TAX NOT APPLICABLE — This invoice was generated WITHOUT TAX. Grand Total = ₹${fmt(invoice.grandTotal)} (no GST applied).`,
-          boxX + 8,
-          curY + 4
-        );
-        curY += noTaxH;
       }
+      // If without tax: NOTHING drawn for tax description!
 
       // ── 8. DECLARATION, BANK DETAILS & SIGNATORY ─────────────────────────────────
       const footerBoxH = 68;

@@ -9,10 +9,9 @@ const formatDate = (d) =>
 /**
  * MASTER INVOICE TEMPLATE — Single Source of Truth
  * Exactly matches the canonical Invoice Viewing layout and styling.
- * Used for:
- *   - Invoice Viewing Page
- *   - Print Output (@media print)
- *   - PDF Download & Preview
+ * Rules:
+ *  - If with tax: Show full tax description (CGST/SGST/IGST and HSN GST summary table).
+ *  - If without tax: Show NOTHING about tax (no "Without Tax", no "Tax 0.00", no tax banner).
  */
 const InvoiceTemplate = ({ invoice }) => {
   if (!invoice) return null;
@@ -51,8 +50,8 @@ const InvoiceTemplate = ({ invoice }) => {
           letterSpacing: '3px',
           borderBottom: '1px solid #000',
           padding: '8px 0',
-          background: isWithoutTax ? '#fffbeb' : '#f8fafc',
-          color: isWithoutTax ? '#92400e' : '#15527A',
+          background: '#f8fafc',
+          color: isWithoutTax ? '#15527A' : '#15527A',
         }}
       >
         {invoiceTitle}
@@ -153,7 +152,7 @@ const InvoiceTemplate = ({ invoice }) => {
           >
             <div style={{ fontWeight: 'bold', fontSize: '11px' }}>{cust.name}</div>
             <div style={{ whiteSpace: 'pre-line', color: '#333' }}>{cust.address}</div>
-            {cust.gstin && <div>GSTIN/UIN: {cust.gstin}</div>}
+            {!isWithoutTax && cust.gstin && <div>GSTIN/UIN: {cust.gstin}</div>}
             <div>
               State: {cust.state} | Code: {cust.stateCode}
             </div>
@@ -271,23 +270,6 @@ const InvoiceTemplate = ({ invoice }) => {
           <div style={{ fontWeight: 'bold', marginBottom: '4px' }}>Amount Chargeable (in words)</div>
           <div style={{ fontStyle: 'italic', lineHeight: '1.4' }}>{invoice.amountInWords}</div>
           <div style={{ marginTop: '8px', fontSize: '9px', color: '#555' }}>E. &amp; O.E.</div>
-          {isWithoutTax && (
-            <div
-              style={{
-                marginTop: '8px',
-                display: 'inline-block',
-                background: '#fffbeb',
-                border: '1px solid #fde68a',
-                color: '#92400e',
-                padding: '3px 8px',
-                borderRadius: '4px',
-                fontSize: '9px',
-                fontWeight: 'bold',
-              }}
-            >
-              ⚠ WITHOUT TAX INVOICE
-            </div>
-          )}
         </div>
 
         {/* Right: Calculations */}
@@ -309,7 +291,8 @@ const InvoiceTemplate = ({ invoice }) => {
             <span>₹{fmt(invoice.taxableValue)}</span>
           </div>
 
-          {!isWithoutTax ? (
+          {/* If with tax: show CGST, SGST, IGST, Total Tax. If without tax: NOTHING! */}
+          {!isWithoutTax && (
             <>
               {!invoice.isInterState ? (
                 <>
@@ -333,11 +316,6 @@ const InvoiceTemplate = ({ invoice }) => {
                 <span>₹{fmt(invoice.totalTax)}</span>
               </div>
             </>
-          ) : (
-            <div style={{ display: 'flex', justifyContent: 'space-between', padding: '2px 0', borderBottom: '1px solid #eee', color: '#92400e' }}>
-              <span>Tax (Without Tax Mode)</span>
-              <span>₹0.00</span>
-            </div>
           )}
 
           <div style={{ display: 'flex', justifyContent: 'space-between', padding: '2px 0', borderBottom: '1px solid #eee' }}>
@@ -364,8 +342,8 @@ const InvoiceTemplate = ({ invoice }) => {
         </div>
       </div>
 
-      {/* 7. GST Summary */}
-      {!isWithoutTax ? (
+      {/* 7. GST Summary — ONLY IF WITH TAX */}
+      {!isWithoutTax && (
         <div style={{ padding: '8px', borderTop: '1px solid #000' }}>
           <div style={{ fontWeight: 'bold', fontSize: '10px', marginBottom: '4px' }}>
             Tax Amount (in words): {invoice.taxAmountInWords}
@@ -452,20 +430,6 @@ const InvoiceTemplate = ({ invoice }) => {
               })()}
             </tbody>
           </table>
-        </div>
-      ) : (
-        <div
-          style={{
-            padding: '8px 12px',
-            borderTop: '1px solid #000',
-            background: '#fffbeb',
-            fontSize: '9.5px',
-            color: '#92400e',
-            fontWeight: 'bold',
-          }}
-        >
-          ⚠ TAX NOT APPLICABLE — This invoice was generated WITHOUT TAX. Grand Total = ₹
-          {fmt(invoice.grandTotal)} (no GST applied).
         </div>
       )}
 
