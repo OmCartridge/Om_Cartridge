@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Phone, User, Mail, FileText, MapPin, X, Check, Search, UserPlus, AlertCircle, Loader } from 'lucide-react';
+import { User, X, Search, UserPlus, AlertCircle, Loader } from 'lucide-react';
 import api from '../services/api';
 import toast from 'react-hot-toast';
 
@@ -173,217 +173,127 @@ const CustomerLookupModal = ({ isOpen, onClose, onCustomerReady, initialName = '
 
   return (
     <div
-      style={{
-        position: 'fixed',
-        inset: 0,
-        background: 'rgba(0,0,0,0.55)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        zIndex: 9000,
-        padding: '20px',
-        backdropFilter: 'blur(2px)',
-      }}
+      className="fixed inset-0 bg-black/55 z-[9000] flex items-center justify-center p-4 backdrop-blur-sm transition-opacity"
+      onClick={(e) => { if (e.target === e.currentTarget && !saving) onClose(); }}
     >
-      <div
-        style={{
-          background: '#fff',
-          borderRadius: '16px',
-          width: '100%',
-          maxWidth: '520px',
-          boxShadow: '0 24px 64px rgba(0,0,0,0.22)',
-          overflow: 'hidden',
-          display: 'flex',
-          flexDirection: 'column',
-          maxHeight: '90vh',
-        }}
-      >
+      <div className="bg-white rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden flex flex-col max-h-[90vh] animate-[modal-pop_0.18s_ease-out]">
         {/* Header */}
-        <div
-          style={{
-            background: 'linear-gradient(135deg, #15527A, #1a6fa6)',
-            padding: '16px 20px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            color: '#fff',
-          }}
-        >
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+        <div className="bg-gradient-to-r from-navy to-[#1a6fa6] px-5 py-4 flex items-center justify-between text-white flex-shrink-0">
+          <div className="flex items-center gap-2.5">
             <User size={20} />
-            <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 700 }}>
+            <h3 className="text-base font-bold">
               {activeTab === 'search' ? 'Select Customer' : 'Create New Customer'}
             </h3>
           </div>
           <button
             type="button"
             onClick={onClose}
-            style={{
-              background: 'rgba(255,255,255,0.15)',
-              border: 'none',
-              borderRadius: '50%',
-              width: 28,
-              height: 28,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              color: '#fff',
-              cursor: 'pointer',
-            }}
+            className="w-7 h-7 rounded-full bg-white/15 hover:bg-white/25 flex items-center justify-center text-white transition-colors"
+            aria-label="Close"
           >
             <X size={16} />
           </button>
         </div>
 
         {/* Tab switcher */}
-        <div style={{ display: 'flex', borderBottom: '1px solid #e5e7eb', background: '#f8fafc' }}>
+        <div className="flex border-b border-app-border bg-slate-50 flex-shrink-0">
           <button
             type="button"
             onClick={() => setActiveTab('search')}
-            style={{
-              flex: 1,
-              padding: '12px',
-              background: activeTab === 'search' ? '#fff' : 'transparent',
-              border: 'none',
-              borderBottom: activeTab === 'search' ? '2.5px solid #15527A' : 'none',
-              fontWeight: activeTab === 'search' ? 700 : 500,
-              color: activeTab === 'search' ? '#15527A' : '#64748b',
-              fontSize: '13px',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '6px',
-            }}
+            className={`flex-1 py-3 text-xs sm:text-[13px] font-semibold flex items-center justify-center gap-1.5 transition-colors border-b-2 ${
+              activeTab === 'search'
+                ? 'bg-white text-navy border-navy'
+                : 'text-gray-500 hover:text-gray-700 border-transparent'
+            }`}
           >
             <Search size={14} /> Search Existing
           </button>
           <button
             type="button"
             onClick={handleSwitchToCreate}
-            style={{
-              flex: 1,
-              padding: '12px',
-              background: activeTab === 'create' ? '#fff' : 'transparent',
-              border: 'none',
-              borderBottom: activeTab === 'create' ? '2.5px solid #15527A' : 'none',
-              fontWeight: activeTab === 'create' ? 700 : 500,
-              color: activeTab === 'create' ? '#15527A' : '#64748b',
-              fontSize: '13px',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '6px',
-            }}
+            className={`flex-1 py-3 text-xs sm:text-[13px] font-semibold flex items-center justify-center gap-1.5 transition-colors border-b-2 ${
+              activeTab === 'create'
+                ? 'bg-white text-navy border-navy'
+                : 'text-gray-500 hover:text-gray-700 border-transparent'
+            }`}
           >
             <UserPlus size={14} /> + Add New Customer
           </button>
         </div>
 
         {/* Body */}
-        <div style={{ padding: '20px', overflowY: 'auto', flex: 1 }}>
+        <div className="p-4 sm:p-5 overflow-y-auto flex-1">
           {activeTab === 'search' ? (
             <div>
               {/* Search Bar */}
-              <div style={{ position: 'relative', marginBottom: '16px' }}>
+              <div className="relative mb-4">
                 <Search
                   size={16}
-                  color="#9ca3af"
-                  style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)' }}
+                  className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
                 />
                 <input
                   ref={searchInputRef}
                   type="text"
-                  className="form-control"
+                  className="form-control pl-10 h-10 text-[13.5px]"
                   placeholder="Type customer name or mobile number..."
                   value={searchQuery}
                   onChange={handleSearchChange}
-                  style={{ paddingLeft: '38px', height: '42px', fontSize: '13.5px' }}
                 />
                 {searching && (
                   <Loader
                     size={16}
-                    className="spin"
-                    color="#15527A"
-                    style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)' }}
+                    className="animate-spin absolute right-3 top-1/2 -translate-y-1/2 text-navy"
                   />
                 )}
               </div>
 
               {/* Results List */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', minHeight: '180px' }}>
+              <div className="flex flex-col gap-2 min-h-[180px]">
                 {searchResults.length > 0 ? (
                   searchResults.map((cust) => (
                     <div
                       key={cust._id}
                       onClick={() => handleSelectCustomer(cust)}
-                      style={{
-                        padding: '12px 14px',
-                        borderRadius: '10px',
-                        border: '1px solid #e2e8f0',
-                        background: '#fff',
-                        cursor: 'pointer',
-                        transition: 'all 0.15s ease',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.borderColor = '#15527A';
-                        e.currentTarget.style.background = '#f0f9ff';
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.borderColor = '#e2e8f0';
-                        e.currentTarget.style.background = '#fff';
-                      }}
+                      className="p-3 sm:p-3.5 rounded-xl border border-gray-200 bg-white hover:border-navy hover:bg-sky-50/50 cursor-pointer transition-all flex items-center justify-between gap-2"
                     >
-                      <div>
-                        <div style={{ fontWeight: 700, fontSize: '14px', color: '#0f172a' }}>
+                      <div className="min-w-0 flex-1">
+                        <div className="font-bold text-sm text-gray-900 truncate">
                           {cust.name}
                         </div>
-                        <div style={{ display: 'flex', gap: '12px', fontSize: '12px', color: '#64748b', marginTop: '3px' }}>
+                        <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-gray-500 mt-0.5">
                           {cust.phone && <span>📞 {cust.phone}</span>}
                           {cust.gstin && <span>GST: {cust.gstin}</span>}
                         </div>
                         {cust.address && (
-                          <div style={{ fontSize: '11.5px', color: '#94a3b8', marginTop: '2px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '380px' }}>
+                          <div className="text-[11.5px] text-gray-400 mt-0.5 truncate max-w-sm">
                             📍 {cust.address.replace(/\n/g, ', ')}
                           </div>
                         )}
                       </div>
-                      <span
-                        style={{
-                          fontSize: '11px',
-                          fontWeight: 700,
-                          color: '#15527A',
-                          background: '#e0f2fe',
-                          padding: '4px 10px',
-                          borderRadius: '6px',
-                        }}
-                      >
+                      <span className="text-[11px] font-bold text-navy bg-sky-100 hover:bg-navy hover:text-white px-2.5 py-1 rounded-md transition-colors flex-shrink-0">
                         Select
                       </span>
                     </div>
                   ))
                 ) : hasSearched && !searching ? (
-                  <div style={{ textAlign: 'center', padding: '32px 16px', color: '#64748b' }}>
-                    <AlertCircle size={32} color="#94a3b8" style={{ margin: '0 auto 8px' }} />
-                    <div style={{ fontWeight: 600, color: '#334155' }}>No customer found matching "{searchQuery}"</div>
-                    <div style={{ fontSize: '12px', marginTop: '4px', marginBottom: '16px' }}>
+                  <div className="text-center py-8 px-4 text-gray-500">
+                    <AlertCircle size={32} className="mx-auto mb-2 text-gray-400" />
+                    <div className="font-semibold text-gray-800">
+                      No customer found matching "{searchQuery}"
+                    </div>
+                    <div className="text-xs mt-1 mb-4 text-gray-500">
                       Would you like to create a new customer record?
                     </div>
                     <button
                       type="button"
-                      className="btn btn-primary"
+                      className="btn btn-primary text-xs py-2 px-4 inline-flex items-center gap-1.5"
                       onClick={handleSwitchToCreate}
-                      style={{ margin: '0 auto', fontSize: '12px', padding: '8px 16px' }}
                     >
                       <UserPlus size={14} /> Create "{searchQuery}"
                     </button>
                   </div>
                 ) : (
-                  <div style={{ textAlign: 'center', padding: '40px 16px', color: '#94a3b8', fontSize: '13px' }}>
+                  <div className="text-center py-10 px-4 text-gray-400 text-xs sm:text-sm">
                     Start typing a customer name or mobile number to search
                   </div>
                 )}
@@ -391,30 +301,30 @@ const CustomerLookupModal = ({ isOpen, onClose, onCustomerReady, initialName = '
             </div>
           ) : (
             /* Create Customer Form */
-            <form onSubmit={handleCreateCustomer}>
-              <div className="form-group mb-12">
+            <form onSubmit={handleCreateCustomer} className="space-y-3.5">
+              <div className="form-group mb-0">
                 <label className="form-label">
                   Customer Name <span className="required">*</span>
                 </label>
                 <input
                   type="text"
-                  className={`form-control ${formErrors.name ? 'is-invalid' : ''}`}
+                  className={`form-control ${formErrors.name ? 'error' : ''}`}
                   value={form.name}
                   onChange={(e) => setForm({ ...form, name: e.target.value })}
                   placeholder="Enter full customer / company name"
                   autoFocus
                 />
-                {formErrors.name && <div style={{ color: '#ef4444', fontSize: '11.5px', marginTop: '3px' }}>{formErrors.name}</div>}
+                {formErrors.name && <div className="form-error">{formErrors.name}</div>}
               </div>
 
-              <div className="form-group mb-12">
+              <div className="form-group mb-0">
                 <label className="form-label">
                   Mobile Number (10 Digits) <span className="required">*</span>
                 </label>
                 <input
                   type="text"
                   maxLength={10}
-                  className={`form-control ${formErrors.phone ? 'is-invalid' : ''}`}
+                  className={`form-control ${formErrors.phone ? 'error' : ''}`}
                   value={form.phone}
                   onChange={(e) => {
                     const digits = e.target.value.replace(/\D/g, '').slice(0, 10);
@@ -422,11 +332,11 @@ const CustomerLookupModal = ({ isOpen, onClose, onCustomerReady, initialName = '
                   }}
                   placeholder="10-digit mobile number"
                 />
-                {formErrors.phone && <div style={{ color: '#ef4444', fontSize: '11.5px', marginTop: '3px' }}>{formErrors.phone}</div>}
+                {formErrors.phone && <div className="form-error">{formErrors.phone}</div>}
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }} className="mb-12">
-                <div className="form-group">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="form-group mb-0">
                   <label className="form-label">Email (Optional)</label>
                   <input
                     type="email"
@@ -435,10 +345,10 @@ const CustomerLookupModal = ({ isOpen, onClose, onCustomerReady, initialName = '
                     onChange={(e) => setForm({ ...form, email: e.target.value })}
                     placeholder="customer@example.com"
                   />
-                  {formErrors.email && <div style={{ color: '#ef4444', fontSize: '11.5px', marginTop: '3px' }}>{formErrors.email}</div>}
+                  {formErrors.email && <div className="form-error">{formErrors.email}</div>}
                 </div>
 
-                <div className="form-group">
+                <div className="form-group mb-0">
                   <label className="form-label">GSTIN (Optional)</label>
                   <input
                     type="text"
@@ -448,11 +358,11 @@ const CustomerLookupModal = ({ isOpen, onClose, onCustomerReady, initialName = '
                     placeholder="24ACWPZ3281G1ZX"
                     maxLength={15}
                   />
-                  {formErrors.gstin && <div style={{ color: '#ef4444', fontSize: '11.5px', marginTop: '3px' }}>{formErrors.gstin}</div>}
+                  {formErrors.gstin && <div className="form-error">{formErrors.gstin}</div>}
                 </div>
               </div>
 
-              <div className="form-group mb-12">
+              <div className="form-group mb-0">
                 <label className="form-label">Address</label>
                 <textarea
                   className="form-control"
@@ -463,19 +373,17 @@ const CustomerLookupModal = ({ isOpen, onClose, onCustomerReady, initialName = '
                 />
               </div>
 
-              <div style={{ display: 'flex', gap: '10px', marginTop: '20px' }}>
+              <div className="flex gap-3 pt-2">
                 <button
                   type="button"
-                  className="btn btn-outline"
-                  style={{ flex: 1 }}
+                  className="btn btn-outline flex-1 justify-center"
                   onClick={() => setActiveTab('search')}
                 >
                   Back to Search
                 </button>
                 <button
                   type="submit"
-                  className="btn btn-primary"
-                  style={{ flex: 1 }}
+                  className="btn btn-primary flex-1 justify-center"
                   disabled={saving}
                 >
                   {saving ? 'Saving...' : 'Save & Select'}
@@ -488,5 +396,6 @@ const CustomerLookupModal = ({ isOpen, onClose, onCustomerReady, initialName = '
     </div>
   );
 };
+
 
 export default CustomerLookupModal;

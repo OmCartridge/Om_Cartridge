@@ -38,45 +38,48 @@ const ConfirmModal = ({
 
   if (!isOpen) return null;
 
-  const colors = {
-    danger:  { bg: '#fef2f2', border: '#fecaca', icon: '#dc2626', btn: '#dc2626', btnHover: '#b91c1c', iconComp: <AlertTriangle size={22} color="#dc2626" /> },
-    warning: { bg: '#fffbeb', border: '#fde68a', icon: '#d97706', btn: '#d97706', btnHover: '#b45309', iconComp: <AlertTriangle size={22} color="#d97706" /> },
-    info:    { bg: '#eff6ff', border: '#bfdbfe', icon: '#2563eb', btn: '#15527A', btnHover: '#0e3a57', iconComp: <Info size={22} color="#2563eb" /> },
+  const variantStyles = {
+    danger: {
+      headerBg: 'bg-red-50 border-red-200',
+      icon: <AlertTriangle size={22} className="text-app-danger flex-shrink-0 mt-0.5" />,
+      btn: 'bg-app-danger hover:bg-app-danger-dark text-white',
+    },
+    warning: {
+      headerBg: 'bg-amber-50 border-amber-200',
+      icon: <AlertTriangle size={22} className="text-app-warning flex-shrink-0 mt-0.5" />,
+      btn: 'bg-app-warning hover:bg-app-warning-dark text-white',
+    },
+    info: {
+      headerBg: 'bg-blue-50 border-blue-200',
+      icon: <Info size={22} className="text-app-info flex-shrink-0 mt-0.5" />,
+      btn: 'bg-navy hover:bg-navy-dark text-white',
+    },
   };
-  const c = colors[variant] || colors.danger;
+  const c = variantStyles[variant] || variantStyles.danger;
 
   return (
     <div
-      style={{
-        position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)',
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        zIndex: 9999, padding: '20px', backdropFilter: 'blur(2px)',
-      }}
+      className="fixed inset-0 bg-black/50 z-[9999] flex items-center justify-center p-4 backdrop-blur-sm transition-opacity"
       onClick={(e) => { if (e.target === e.currentTarget && !loading) onCancel?.(); }}
     >
-      <div style={{
-        background: '#fff', borderRadius: '12px', maxWidth: '440px', width: '100%',
-        boxShadow: '0 20px 60px rgba(0,0,0,0.25)', overflow: 'hidden',
-        animation: 'modal-pop 0.18s ease-out',
-      }}>
+      <div className="bg-white rounded-xl max-w-md w-full shadow-2xl overflow-hidden animate-[modal-pop_0.18s_ease-out]">
         {/* Icon Header */}
-        <div style={{
-          background: c.bg, borderBottom: `1px solid ${c.border}`,
-          padding: '20px 24px 16px', display: 'flex', alignItems: 'flex-start', gap: '14px',
-        }}>
-          <div style={{ flexShrink: 0, marginTop: '2px' }}>{c.iconComp}</div>
-          <div style={{ flex: 1 }}>
-            <div style={{ fontWeight: 700, fontSize: '16px', color: '#111', lineHeight: 1.3 }}>{title}</div>
+        <div className={`p-5 sm:p-6 border-b flex items-start gap-3.5 ${c.headerBg}`}>
+          {c.icon}
+          <div className="flex-1 min-w-0">
+            <h3 className="font-bold text-base text-gray-900 leading-snug">{title}</h3>
             {message && (
-              <div style={{ marginTop: '6px', fontSize: '13.5px', color: '#374151', lineHeight: 1.55 }}>
+              <div className="mt-1.5 text-[13.5px] text-gray-600 leading-relaxed">
                 {message}
               </div>
             )}
           </div>
           {!loading && (
             <button
+              type="button"
               onClick={onCancel}
-              style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#9ca3af', padding: '2px', flexShrink: 0 }}
+              className="p-1 text-gray-400 hover:text-gray-600 rounded-md hover:bg-black/5 transition-colors flex-shrink-0"
+              aria-label="Close"
             >
               <X size={18} />
             </button>
@@ -85,62 +88,42 @@ const ConfirmModal = ({
 
         {/* Warning box */}
         {warning && (
-          <div style={{
-            background: '#fffbeb', borderBottom: '1px solid #fde68a',
-            padding: '10px 24px', display: 'flex', alignItems: 'flex-start', gap: '8px',
-          }}>
-            <AlertCircle size={14} color="#d97706" style={{ flexShrink: 0, marginTop: '2px' }} />
-            <span style={{ fontSize: '12.5px', color: '#92400e', lineHeight: 1.5 }}>{warning}</span>
+          <div className="bg-amber-50 border-b border-amber-200 px-6 py-2.5 flex items-start gap-2 text-amber-900 text-xs leading-normal">
+            <AlertCircle size={14} className="text-app-warning flex-shrink-0 mt-0.5" />
+            <span>{warning}</span>
           </div>
         )}
 
         {/* Actions */}
-        <div style={{
-          padding: '16px 24px', display: 'flex', gap: '10px', justifyContent: 'flex-end',
-        }}>
+        <div className="p-4 sm:px-6 flex gap-2.5 justify-end bg-white">
           <button
+            type="button"
             onClick={onCancel}
             disabled={loading}
-            style={{
-              padding: '9px 20px', borderRadius: '8px', border: '1.5px solid #d1d5db',
-              background: '#fff', color: '#374151', cursor: loading ? 'not-allowed' : 'pointer',
-              fontSize: '13.5px', fontWeight: 600, transition: 'all 0.15s',
-            }}
+            className="px-4 py-2 rounded-lg border border-gray-300 bg-white text-gray-700 text-[13.5px] font-semibold hover:bg-gray-50 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
           >
             {cancelText}
           </button>
           <button
+            type="button"
             onClick={onConfirm}
             disabled={loading}
-            style={{
-              padding: '9px 22px', borderRadius: '8px', border: 'none',
-              background: loading ? '#9ca3af' : c.btn, color: '#fff',
-              cursor: loading ? 'not-allowed' : 'pointer',
-              fontSize: '13.5px', fontWeight: 700, transition: 'all 0.15s',
-              display: 'flex', alignItems: 'center', gap: '6px',
-            }}
+            className={`px-5 py-2 rounded-lg text-[13.5px] font-bold shadow-sm transition-all flex items-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed ${
+              loading ? 'bg-gray-400 text-white' : c.btn
+            }`}
           >
             {loading ? (
               <>
-                <span style={{ display: 'inline-block', width: 14, height: 14, border: '2px solid rgba(255,255,255,0.4)', borderTop: '2px solid #fff', borderRadius: '50%', animation: 'spin 0.7s linear infinite' }} />
-                Processing...
+                <span className="inline-block w-3.5 h-3.5 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+                <span>Processing...</span>
               </>
             ) : confirmText}
           </button>
         </div>
       </div>
-
-      <style>{`
-        @keyframes modal-pop {
-          from { opacity: 0; transform: scale(0.94) translateY(-8px); }
-          to   { opacity: 1; transform: scale(1) translateY(0); }
-        }
-        @keyframes spin {
-          to { transform: rotate(360deg); }
-        }
-      `}</style>
     </div>
   );
 };
 
 export default ConfirmModal;
+

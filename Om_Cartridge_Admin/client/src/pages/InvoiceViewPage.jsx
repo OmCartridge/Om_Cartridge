@@ -75,35 +75,40 @@ const InvoiceViewPage = () => {
     <AppLayout title={`Invoice ${invoice.invoiceNumber}`}>
       {/* Success banner for new invoices */}
       {isNew && (
-        <div
-          style={{
-            background: 'var(--success-bg)',
-            border: '1px solid var(--success)',
-            borderRadius: 'var(--radius)',
-            padding: '14px 20px',
-            marginBottom: '20px',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '12px',
-          }}
-        >
-          <CheckCircle size={20} color="var(--success)" />
-          <div>
-            <div style={{ fontWeight: 600, color: 'var(--success)' }}>Invoice Generated Successfully!</div>
-            <div style={{ fontSize: '13px', color: 'var(--text-muted)', marginTop: '2px' }}>
-              Stock has been automatically deducted. Invoice: {invoice.invoiceNumber}
+        <div className="bg-emerald-50 border border-emerald-300 rounded-xl p-4 sm:p-5 mb-5 flex flex-col sm:flex-row sm:items-center gap-3">
+          <div className="flex items-center gap-3">
+            <CheckCircle size={22} className="text-app-success flex-shrink-0" />
+            <div>
+              <div className="font-bold text-sm sm:text-base text-emerald-900">Invoice Generated Successfully!</div>
+              <div className="text-xs sm:text-[13px] text-gray-600 mt-0.5">
+                Stock has been automatically deducted. Invoice: {invoice.invoiceNumber}
+              </div>
             </div>
           </div>
-          <div style={{ marginLeft: 'auto', display: 'flex', gap: '8px' }}>
-            <button className="btn btn-success btn-sm" onClick={downloadPDF} disabled={downloading}>
+          <div className="flex flex-wrap items-center gap-2 sm:ml-auto pt-2 sm:pt-0">
+            <button
+              type="button"
+              className="btn btn-success btn-sm gap-1.5"
+              onClick={downloadPDF}
+              disabled={downloading}
+            >
               <Download size={14} /> {downloading ? 'Downloading...' : 'Download PDF'}
             </button>
             {invoice.customerSnapshot?.email && (
-              <button className="btn btn-outline btn-sm" onClick={emailInvoice} disabled={emailing}>
+              <button
+                type="button"
+                className="btn btn-outline btn-sm gap-1.5"
+                onClick={emailInvoice}
+                disabled={emailing}
+              >
                 <Mail size={14} /> {emailing ? '...' : 'Email'}
               </button>
             )}
-            <button className="btn btn-primary btn-sm" onClick={() => navigate('/invoices/create')}>
+            <button
+              type="button"
+              className="btn btn-primary btn-sm gap-1.5"
+              onClick={() => navigate('/invoices/create')}
+            >
               + New Invoice
             </button>
           </div>
@@ -111,40 +116,56 @@ const InvoiceViewPage = () => {
       )}
 
       {/* Actions Bar */}
-      <div style={{ display: 'flex', gap: '10px', marginBottom: '20px', alignItems: 'center', flexWrap: 'wrap' }}>
-        <button className="btn btn-outline btn-sm" onClick={() => navigate('/invoices')}>
+      <div className="flex items-center gap-2.5 mb-5 flex-wrap">
+        <button
+          type="button"
+          className="btn btn-outline btn-sm gap-1.5"
+          onClick={() => navigate('/invoices')}
+        >
           <ArrowLeft size={14} /> Back
         </button>
         <span
-          style={{
-            padding: '3px 10px',
-            borderRadius: '99px',
-            fontSize: '11px',
-            fontWeight: 800,
-            background: isWithoutTax ? '#fef3c7' : '#dbeafe',
-            color: isWithoutTax ? '#b45309' : '#1d4ed8',
-          }}
+          className={`px-3 py-1 rounded-full text-xs font-bold whitespace-nowrap ${
+            isWithoutTax ? 'bg-amber-100 text-amber-800' : 'bg-blue-100 text-blue-800'
+          }`}
         >
           {isWithoutTax ? 'Om Cartridge (Without Tax)' : 'Om Enterprise (Tax Invoice)'}
         </span>
-        <div style={{ flex: 1 }} />
-        <button className="btn btn-outline" onClick={printInvoice}>
+        <div className="flex-1 min-w-[20px]" />
+        <button
+          type="button"
+          className="btn btn-outline btn-sm sm:btn-md gap-1.5"
+          onClick={printInvoice}
+        >
           <Printer size={15} /> Print
         </button>
-        <button className="btn btn-primary" onClick={downloadPDF} disabled={downloading}>
+        <button
+          type="button"
+          className="btn btn-primary btn-sm sm:btn-md gap-1.5"
+          onClick={downloadPDF}
+          disabled={downloading}
+        >
           <Download size={15} /> {downloading ? 'Downloading...' : 'Download PDF'}
         </button>
         {invoice.customerSnapshot?.email && (
-          <button className="btn btn-outline" onClick={emailInvoice} disabled={emailing}>
+          <button
+            type="button"
+            className="btn btn-outline btn-sm sm:btn-md gap-1.5"
+            onClick={emailInvoice}
+            disabled={emailing}
+          >
             <Mail size={15} /> {emailing ? 'Sending...' : 'Email Invoice'}
           </button>
         )}
       </div>
 
-      {/* CANONICAL MASTER INVOICE TEMPLATE */}
-      <InvoiceTemplate invoice={invoice} />
+      {/* CANONICAL MASTER INVOICE TEMPLATE (Wrapped in horizontal scroll container for mobile responsiveness) */}
+      <div className="w-full overflow-x-auto pb-8">
+        <InvoiceTemplate invoice={invoice} />
+      </div>
     </AppLayout>
   );
 };
+
 
 export default InvoiceViewPage;

@@ -101,21 +101,17 @@ const ProductSearchInput = ({
   };
 
   return (
-    <div ref={containerRef} style={{ position: 'relative', width: '100%', minWidth: '220px' }}>
+    <div ref={containerRef} className="relative w-full min-w-[200px]">
       <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          position: 'relative',
-          background: disabled ? '#f3f4f6' : '#fff',
-          border: `1.5px solid ${error ? '#ef4444' : isOpen ? '#15527A' : '#d1d5db'}`,
-          borderRadius: '8px',
-          padding: '2px 8px',
-          transition: 'border-color 0.15s ease, box-shadow 0.15s ease',
-          boxShadow: isOpen ? '0 0 0 3px rgba(21, 82, 122, 0.12)' : 'none',
-        }}
+        className={`flex items-center relative rounded-lg px-2 py-0.5 transition-all border ${
+          error
+            ? 'border-red-500 ring-2 ring-red-100'
+            : isOpen
+            ? 'border-navy ring-2 ring-navy/15'
+            : 'border-app-border-dark hover:border-navy/60'
+        } ${disabled ? 'bg-gray-100' : 'bg-white'}`}
       >
-        <Search size={14} color="#9ca3af" style={{ marginRight: '6px', flexShrink: 0 }} />
+        <Search size={14} className="text-gray-400 mr-1.5 flex-shrink-0" />
         <input
           ref={inputRef}
           type="text"
@@ -132,32 +128,16 @@ const ProductSearchInput = ({
           }}
           onKeyDown={handleKeyDown}
           placeholder={placeholder}
-          style={{
-            width: '100%',
-            border: 'none',
-            outline: 'none',
-            fontSize: '12px',
-            padding: '6px 0',
-            background: 'transparent',
-            color: '#1f2937',
-            fontWeight: selectedProduct ? 600 : 400,
-          }}
+          className={`w-full border-none outline-none text-xs py-1.5 bg-transparent text-gray-800 placeholder:text-gray-400 ${
+            selectedProduct ? 'font-semibold' : 'font-normal'
+          }`}
         />
 
         {selectedProduct && (
           <button
             type="button"
             onClick={handleClear}
-            style={{
-              background: 'none',
-              border: 'none',
-              padding: '2px',
-              cursor: 'pointer',
-              color: '#9ca3af',
-              display: 'flex',
-              alignItems: 'center',
-              borderRadius: '4px',
-            }}
+            className="p-1 hover:bg-gray-100 rounded text-gray-400 hover:text-gray-600 transition-colors flex items-center"
             title="Clear selected product"
           >
             <X size={13} />
@@ -168,46 +148,20 @@ const ProductSearchInput = ({
           type="button"
           tabIndex={-1}
           onClick={() => setIsOpen((prev) => !prev)}
-          style={{
-            background: 'none',
-            border: 'none',
-            padding: '2px',
-            cursor: 'pointer',
-            color: '#9ca3af',
-            display: 'flex',
-            alignItems: 'center',
-          }}
+          className="p-1 text-gray-400 hover:text-gray-600 transition-colors flex items-center"
         >
           <ChevronDown
             size={13}
-            style={{
-              transform: isOpen ? 'rotate(180deg)' : 'none',
-              transition: 'transform 0.15s ease',
-            }}
+            className={`transition-transform duration-150 ${isOpen ? 'rotate-180' : ''}`}
           />
         </button>
       </div>
 
       {/* Dropdown Menu */}
       {isOpen && (
-        <div
-          style={{
-            position: 'absolute',
-            top: 'calc(100% + 4px)',
-            left: 0,
-            right: 0,
-            zIndex: 100,
-            background: '#ffffff',
-            borderRadius: '10px',
-            border: '1px solid #e5e7eb',
-            boxShadow: '0 12px 28px rgba(0, 0, 0, 0.12), 0 4px 10px rgba(0, 0, 0, 0.06)',
-            maxHeight: '260px',
-            overflowY: 'auto',
-            padding: '4px',
-          }}
-        >
+        <div className="absolute top-[calc(100%+4px)] left-0 right-0 z-50 bg-white rounded-xl border border-app-border shadow-xl max-h-64 overflow-y-auto p-1.5">
           {filteredProducts.length === 0 ? (
-            <div style={{ padding: '14px', textAlign: 'center', fontSize: '12px', color: '#6b7280' }}>
+            <div className="p-3.5 text-center text-xs text-gray-500">
               No matching products found
             </div>
           ) : (
@@ -222,59 +176,47 @@ const ProductSearchInput = ({
                   key={p._id}
                   onClick={() => !isOutOfStock && handleSelect(p)}
                   onMouseEnter={() => setHighlightIndex(idx)}
-                  style={{
-                    padding: '8px 10px',
-                    borderRadius: '6px',
-                    cursor: isOutOfStock ? 'not-allowed' : 'pointer',
-                    background: isSelected
-                      ? '#eff6ff'
+                  className={`p-2 rounded-lg flex items-center justify-between gap-2.5 transition-colors border-b border-gray-50 last:border-none ${
+                    isOutOfStock
+                      ? 'cursor-not-allowed opacity-60'
+                      : 'cursor-pointer'
+                  } ${
+                    isSelected
+                      ? 'bg-blue-50 text-navy'
                       : isHighlighted
-                      ? '#f8fafc'
-                      : 'transparent',
-                    opacity: isOutOfStock ? 0.6 : 1,
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    gap: '10px',
-                    borderBottom: '1px solid #f1f5f9',
-                  }}
+                      ? 'bg-slate-50'
+                      : 'bg-transparent'
+                  }`}
                 >
-                  <div style={{ flex: 1, minWidth: 0 }}>
+                  <div className="flex-1 min-w-0">
                     <div
-                      style={{
-                        fontSize: '12.5px',
-                        fontWeight: 600,
-                        color: isSelected ? '#15527A' : '#1e293b',
-                        whiteSpace: 'nowrap',
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                      }}
+                      className={`text-xs font-semibold truncate ${
+                        isSelected ? 'text-navy' : 'text-gray-900'
+                      }`}
                     >
                       {p.name}
                     </div>
-                    <div style={{ display: 'flex', gap: '8px', fontSize: '11px', color: '#64748b', marginTop: '2px' }}>
+                    <div className="flex items-center gap-2 text-[11px] text-gray-500 mt-0.5">
                       {p.sku && <span>SKU: {p.sku}</span>}
                       {p.hsnSac && <span>HSN: {p.hsnSac}</span>}
                     </div>
                   </div>
 
-                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', flexShrink: 0 }}>
-                    <div style={{ fontSize: '12px', fontWeight: 700, color: '#0f172a' }}>
+                  <div className="flex flex-col items-end flex-shrink-0">
+                    <div className="text-xs font-bold text-gray-900">
                       ₹{Number(p.sellingRate || 0).toLocaleString('en-IN')}
                     </div>
-                    <div
-                      style={{
-                        fontSize: '10px',
-                        fontWeight: 700,
-                        padding: '1px 6px',
-                        borderRadius: '4px',
-                        marginTop: '2px',
-                        background: isOutOfStock ? '#fee2e2' : isLowStock ? '#fef3c7' : '#dcfce7',
-                        color: isOutOfStock ? '#dc2626' : isLowStock ? '#d97706' : '#16a34a',
-                      }}
+                    <span
+                      className={`text-[10px] font-bold px-1.5 py-0.5 rounded mt-0.5 ${
+                        isOutOfStock
+                          ? 'bg-red-100 text-app-danger'
+                          : isLowStock
+                          ? 'bg-amber-100 text-app-warning'
+                          : 'bg-emerald-100 text-app-success'
+                      }`}
                     >
                       {isOutOfStock ? 'OUT OF STOCK' : `${p.quantity} ${p.unit || 'PCS'} in stock`}
-                    </div>
+                    </span>
                   </div>
                 </div>
               );
@@ -285,5 +227,6 @@ const ProductSearchInput = ({
     </div>
   );
 };
+
 
 export default ProductSearchInput;

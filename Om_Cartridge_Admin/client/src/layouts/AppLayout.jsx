@@ -37,119 +37,105 @@ const AppLayout = ({ children, title }) => {
   };
 
   return (
-    <div className="app-layout">
+    <div className="flex h-screen overflow-hidden bg-surface-bg font-sans">
       {/* Mobile Drawer Backdrop */}
       {mobileMenuOpen && (
         <div
-          className="mobile-backdrop"
+          className="fixed inset-0 bg-black/50 z-40 backdrop-blur-sm transition-opacity lg:hidden"
           onClick={() => setMobileMenuOpen(false)}
-          style={{
-            position: 'fixed',
-            inset: 0,
-            background: 'rgba(0,0,0,0.5)',
-            zIndex: 140,
-            backdropFilter: 'blur(2px)',
-          }}
+          aria-hidden="true"
         />
       )}
 
-      {/* Sidebar */}
-      <aside className={`sidebar ${mobileMenuOpen ? 'mobile-open' : ''}`}>
-        <div className="sidebar-logo" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+      {/* Sidebar - Desktop (static w-60) & Mobile Drawer (fixed off-canvas w-64) */}
+      <aside
+        className={`fixed inset-y-0 left-0 z-50 w-64 bg-navy text-white flex flex-col transition-transform duration-300 ease-in-out shadow-2xl lg:shadow-none lg:static lg:translate-x-0 lg:w-60 ${
+          mobileMenuOpen ? 'translate-x-0' : '-translate-x-full'
+        }`}
+      >
+        <div className="p-4 border-b border-white/10 flex items-center justify-between">
           <OMLogo variant="compact" />
           <button
             type="button"
-            className="mobile-close-btn"
+            className="lg:hidden p-1.5 text-white/80 hover:text-white rounded-lg hover:bg-white/10 transition-colors"
             onClick={() => setMobileMenuOpen(false)}
-            style={{
-              background: 'none',
-              border: 'none',
-              color: '#fff',
-              display: 'none',
-              cursor: 'pointer',
-            }}
+            aria-label="Close menu"
           >
             <X size={20} />
           </button>
         </div>
 
-        <nav className="sidebar-nav">
+        <nav className="flex-1 py-3 px-2.5 space-y-1 overflow-y-auto">
           {navItems.map(({ to, label, icon: Icon }) => (
             <NavLink
               key={to}
               to={to}
-              className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
               end={to === '/dashboard'}
               onClick={() => setMobileMenuOpen(false)}
+              className={({ isActive }) =>
+                `flex items-center gap-3 px-3 py-2.5 rounded-lg text-[13.5px] font-medium transition-all ${
+                  isActive
+                    ? 'bg-white/15 text-white font-semibold shadow-sm border-l-4 border-red-brand pl-2'
+                    : 'text-white/75 hover:bg-white/10 hover:text-white border-l-4 border-transparent pl-2'
+                }`
+              }
             >
-              <Icon size={18} />
+              <Icon size={18} className="flex-shrink-0" />
               <span>{label}</span>
             </NavLink>
           ))}
         </nav>
 
-        <div className="sidebar-footer">
+        <div className="p-2.5 border-t border-white/10">
           <button
-            className="nav-item"
+            type="button"
+            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-[13.5px] font-medium text-white/75 hover:bg-red-brand/20 hover:text-white transition-colors border-l-4 border-transparent pl-2 text-left"
             onClick={() => {
               setMobileMenuOpen(false);
               setShowLogoutConfirm(true);
             }}
-            style={{ width: '100%', background: 'none', border: 'none', textAlign: 'left' }}
           >
-            <LogOut size={18} />
+            <LogOut size={18} className="flex-shrink-0" />
             <span>Logout</span>
           </button>
         </div>
       </aside>
 
-      {/* Main Area */}
-      <div className="main-area">
-        <header className="top-header">
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+      {/* Main Content Shell */}
+      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+        {/* Top Header */}
+        <header className="h-[60px] bg-surface-white border-b border-app-border flex items-center justify-between px-4 sm:px-6 flex-shrink-0 shadow-sm z-10">
+          <div className="flex items-center gap-3 min-w-0">
             <button
               type="button"
-              className="hamburger-btn"
+              className="lg:hidden p-2 -ml-2 text-app-text-dark hover:bg-surface-bg rounded-lg transition-colors"
               onClick={() => setMobileMenuOpen(true)}
-              style={{
-                display: 'none',
-                background: 'none',
-                border: 'none',
-                color: 'var(--text-dark)',
-                cursor: 'pointer',
-                padding: '4px',
-              }}
               title="Open Navigation"
+              aria-label="Open Navigation"
             >
               <Menu size={22} />
             </button>
-            <div className="header-title">{title || 'OM Cartridge Management'}</div>
+            <h1 className="text-base sm:text-lg font-semibold text-app-text-dark tracking-tight truncate">
+              {title || 'OM Cartridge Management'}
+            </h1>
           </div>
 
-          <div className="header-right">
-            <div className="header-user">
-              <div
-                style={{
-                  width: 28,
-                  height: 28,
-                  borderRadius: '50%',
-                  background: 'var(--navy)',
-                  color: '#fff',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  fontSize: '12px',
-                  fontWeight: 700,
-                }}
-              >
+          <div className="flex items-center gap-3 flex-shrink-0">
+            <div className="flex items-center gap-2 px-3 py-1.5 bg-surface-bg rounded-full border border-app-border">
+              <div className="w-7 h-7 rounded-full bg-navy text-white flex items-center justify-center text-xs font-bold flex-shrink-0">
                 {user?.name?.[0]?.toUpperCase() || 'A'}
               </div>
-              <span className="user-name-text">{user?.name || 'Admin'}</span>
+              <span className="hidden sm:inline text-xs font-medium text-app-text-dark">
+                {user?.name || 'Admin'}
+              </span>
             </div>
           </div>
         </header>
 
-        <main className="page-content">{children}</main>
+        {/* Page Content Viewport */}
+        <main className="flex-1 overflow-y-auto p-4 sm:p-6 bg-surface-bg focus:outline-none">
+          {children}
+        </main>
       </div>
 
       {/* Logout Confirmation Modal */}
@@ -169,3 +155,4 @@ const AppLayout = ({ children, title }) => {
 };
 
 export default AppLayout;
+

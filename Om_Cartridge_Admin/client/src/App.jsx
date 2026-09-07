@@ -15,10 +15,10 @@ const ProtectedRoute = ({ children }) => {
   const { isAuthenticated, loading } = useAuth();
   if (loading) {
     return (
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh' }}>
-        <div style={{ textAlign: 'center' }}>
-          <div className="spinner" style={{ width: '40px', height: '40px', margin: '0 auto 12px' }} />
-          <div style={{ color: '#6b7280', fontSize: '14px' }}>Loading...</div>
+      <div className="flex items-center justify-center min-h-screen bg-slate-50">
+        <div className="text-center">
+          <div className="spinner w-10 h-10 mx-auto mb-3" />
+          <div className="text-gray-500 text-sm font-medium">Loading...</div>
         </div>
       </div>
     );

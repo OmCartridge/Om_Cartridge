@@ -64,36 +64,51 @@ const DashboardPage = () => {
 
   return (
     <AppLayout title="Dashboard">
-      {/* Stats */}
-      <div className="stats-grid">
+      {/* Stats Grid: 2 cols on mobile, 3 on tablet, 6 on desktop */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 gap-3 sm:gap-4 mb-6">
         {stats.map(({ label, value, icon: Icon, color }) => (
-          <div className="stat-card" key={label}>
-            <div className={`stat-icon ${color}`}><Icon size={22} /></div>
-            <div>
-              <div className="stat-value">{value}</div>
-              <div className="stat-label">{label}</div>
+          <div
+            key={label}
+            className="bg-white rounded-xl p-3.5 sm:p-4 border border-app-border shadow-sm flex items-start gap-3 transition-shadow hover:shadow-md"
+          >
+            <div className={`stat-icon ${color}`}>
+              <Icon size={20} />
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="text-xl sm:text-2xl font-bold text-gray-900 leading-none truncate">
+                {value}
+              </div>
+              <div className="text-[11.5px] font-medium text-gray-500 mt-1 truncate">
+                {label}
+              </div>
             </div>
           </div>
         ))}
       </div>
 
-      {/* Two column */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 340px', gap: '20px' }}>
-        {/* Recent Invoices */}
-        <div className="card">
+      {/* Main Content: 1 col on mobile/tablet, 2 col on desktop (lg) */}
+      <div className="grid grid-cols-1 lg:grid-cols-[1fr_340px] gap-5 items-start">
+        {/* Recent Invoices Card */}
+        <div className="card overflow-hidden">
           <div className="card-header">
-            <div className="card-title">Recent Invoices</div>
-            <button className="btn btn-outline btn-sm" onClick={() => navigate('/invoices')}>View All</button>
+            <h2 className="card-title">Recent Invoices</h2>
+            <button
+              type="button"
+              className="btn btn-outline btn-sm text-xs"
+              onClick={() => navigate('/invoices')}
+            >
+              View All
+            </button>
           </div>
           <div className="table-wrapper">
             {recentInvoices.length === 0 ? (
-              <div className="empty-state">
-                <FileText size={36} />
-                <h3>No invoices yet</h3>
-                <p>Create your first invoice to see it here</p>
+              <div className="empty-state py-12">
+                <FileText size={36} className="mx-auto mb-2 text-gray-300" />
+                <h3 className="text-sm font-semibold text-gray-800">No invoices yet</h3>
+                <p className="text-xs text-gray-500">Create your first invoice to see it here</p>
               </div>
             ) : (
-              <table>
+              <table className="w-full">
                 <thead>
                   <tr>
                     <th>Invoice #</th>
@@ -105,17 +120,39 @@ const DashboardPage = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {recentInvoices.map(inv => (
+                  {recentInvoices.map((inv) => (
                     <tr key={inv._id}>
-                      <td><span className="fw-bold text-navy">{inv.invoiceNumber}</span></td>
-                      <td>{inv.customerSnapshot?.name || inv.customerId?.name || '-'}</td>
-                      <td>{formatDate(inv.invoiceDate)}</td>
-                      <td className="fw-bold">₹{formatCurrency(inv.grandTotal)}</td>
-                      <td><StatusBadge status={inv.status} /></td>
                       <td>
-                        <div style={{ display: 'flex', gap: '6px' }}>
-                          <button className="btn btn-outline btn-sm" onClick={() => navigate(`/invoices/${inv._id}`)}>View</button>
-                          <button className="btn btn-outline btn-sm" onClick={() => downloadInvoicePDF(inv._id, inv.invoiceNumber).catch(() => toast.error('PDF download failed'))}>PDF</button>
+                        <span className="font-bold text-navy">{inv.invoiceNumber}</span>
+                      </td>
+                      <td className="max-w-[160px] truncate">
+                        {inv.customerSnapshot?.name || inv.customerId?.name || '-'}
+                      </td>
+                      <td className="whitespace-nowrap">{formatDate(inv.invoiceDate)}</td>
+                      <td className="font-bold whitespace-nowrap">₹{formatCurrency(inv.grandTotal)}</td>
+                      <td>
+                        <StatusBadge status={inv.status} />
+                      </td>
+                      <td>
+                        <div className="flex items-center gap-1.5 whitespace-nowrap">
+                          <button
+                            type="button"
+                            className="btn btn-outline btn-sm text-xs py-1 px-2.5"
+                            onClick={() => navigate(`/invoices/${inv._id}`)}
+                          >
+                            View
+                          </button>
+                          <button
+                            type="button"
+                            className="btn btn-outline btn-sm text-xs py-1 px-2.5"
+                            onClick={() =>
+                              downloadInvoicePDF(inv._id, inv.invoiceNumber).catch(() =>
+                                toast.error('PDF download failed')
+                              )
+                            }
+                          >
+                            PDF
+                          </button>
                         </div>
                       </td>
                     </tr>
@@ -126,59 +163,65 @@ const DashboardPage = () => {
           </div>
         </div>
 
-        {/* Low Stock */}
-        <div className="card">
+        {/* Low Stock Alerts Card */}
+        <div className="card overflow-hidden">
           <div className="card-header">
-            <div className="card-title" style={{ color: '#d97706', display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <div className="text-amber-600 font-semibold flex items-center gap-2 text-sm sm:text-base">
               <AlertTriangle size={18} />
               <span>Low Stock Alerts</span>
             </div>
-            <span className="badge badge-warning" style={{ fontSize: '11px' }}>
+            <span className="badge badge-warning text-[11px]">
               {lowStock.length} items &lt; 20
             </span>
           </div>
           {lowStock.length === 0 ? (
-            <div className="empty-state" style={{ padding: '36px 20px', textAlign: 'center' }}>
-              <div style={{ color: 'var(--success)', fontWeight: 600, fontSize: '14px', marginBottom: '4px' }}>
+            <div className="py-9 px-5 text-center">
+              <div className="text-emerald-700 font-semibold text-sm mb-1">
                 All inventory levels are healthy.
               </div>
-              <p style={{ fontSize: '12px', color: 'var(--text-muted)' }}>No products currently have stock below 20.</p>
+              <p className="text-xs text-gray-500">No products currently have stock below 20.</p>
             </div>
           ) : (
-            <div style={{ maxHeight: '420px', overflowY: 'auto' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
-                <thead>
-                  <tr style={{ background: 'var(--bg-light)', borderBottom: '1px solid var(--border)' }}>
-                    <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: 600, color: 'var(--text-muted)' }}>Product</th>
-                    <th style={{ padding: '8px 8px', textAlign: 'left', fontWeight: 600, color: 'var(--text-muted)' }}>SKU</th>
-                    <th style={{ padding: '8px 8px', textAlign: 'center', fontWeight: 600, color: 'var(--text-muted)' }}>Stock</th>
-                    <th style={{ padding: '8px 12px', textAlign: 'right', fontWeight: 600, color: 'var(--text-muted)' }}>Status</th>
+            <div className="max-h-[420px] overflow-y-auto">
+              <table className="w-full text-xs">
+                <thead className="bg-surface-bg border-b border-app-border sticky top-0">
+                  <tr>
+                    <th className="py-2 px-3 text-left font-semibold text-gray-500">Product</th>
+                    <th className="py-2 px-2 text-left font-semibold text-gray-500">SKU</th>
+                    <th className="py-2 px-2 text-center font-semibold text-gray-500">Stock</th>
+                    <th className="py-2 px-3 text-right font-semibold text-gray-500">Status</th>
                   </tr>
                 </thead>
-                <tbody>
-                  {lowStock.map(p => (
-                    <tr key={p._id} style={{ borderBottom: '1px solid var(--border)' }}>
-                      <td style={{ padding: '8px 12px' }}>
-                        <div style={{ fontWeight: 600, color: 'var(--text-dark)' }}>{p.name}</div>
+                <tbody className="divide-y divide-app-border">
+                  {lowStock.map((p) => (
+                    <tr key={p._id}>
+                      <td className="py-2.5 px-3">
+                        <div className="font-semibold text-gray-900 truncate max-w-[120px]">
+                          {p.name}
+                        </div>
                       </td>
-                      <td style={{ padding: '8px 8px' }}>
-                        <code style={{ fontSize: '11px', background: '#f3f4f6', padding: '1px 5px', borderRadius: '4px' }}>{p.sku}</code>
+                      <td className="py-2.5 px-2">
+                        <code className="text-[11px] bg-gray-100 px-1.5 py-0.5 rounded font-mono">
+                          {p.sku}
+                        </code>
                       </td>
-                      <td style={{ padding: '8px 8px', textAlign: 'center' }}>
-                        <span style={{ fontWeight: 700, color: p.quantity <= 0 ? 'var(--red)' : '#d97706' }}>
+                      <td className="py-2.5 px-2 text-center">
+                        <span
+                          className={`font-bold ${
+                            p.quantity <= 0 ? 'text-app-danger' : 'text-amber-600'
+                          }`}
+                        >
                           {p.quantity} {p.unit || ''}
                         </span>
                       </td>
-                      <td style={{ padding: '8px 12px', textAlign: 'right' }}>
-                        <span style={{
-                          display: 'inline-block',
-                          padding: '2px 6px',
-                          borderRadius: '4px',
-                          fontSize: '10.5px',
-                          fontWeight: 700,
-                          background: p.quantity <= 0 ? '#fee2e2' : '#fef3c7',
-                          color: p.quantity <= 0 ? '#dc2626' : '#b45309',
-                        }}>
+                      <td className="py-2.5 px-3 text-right">
+                        <span
+                          className={`inline-block px-1.5 py-0.5 rounded text-[10.5px] font-bold ${
+                            p.quantity <= 0
+                              ? 'bg-red-100 text-app-danger'
+                              : 'bg-amber-100 text-amber-800'
+                          }`}
+                        >
                           {p.quantity <= 0 ? 'Out of Stock' : 'Low Stock'}
                         </span>
                       </td>
@@ -193,5 +236,6 @@ const DashboardPage = () => {
     </AppLayout>
   );
 };
+
 
 export default DashboardPage;

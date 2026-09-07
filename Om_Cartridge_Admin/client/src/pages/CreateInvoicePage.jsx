@@ -99,62 +99,29 @@ const DiscountControl = ({ item, onChange }) => {
   };
 
   return (
-    <div style={{ position: 'relative' }}>
+    <div className="relative">
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '5px',
-          padding: '4px 8px',
-          borderRadius: '6px',
-          border: '1px solid',
-          borderColor: item.discountType !== 'none' ? '#fca5a5' : '#e5e7eb',
-          background: item.discountType !== 'none' ? '#fef2f2' : '#f9fafb',
-          color: item.discountType !== 'none' ? '#dc2626' : '#6b7280',
-          cursor: 'pointer',
-          fontSize: '11.5px',
-          fontWeight: 600,
-          whiteSpace: 'nowrap',
-        }}
+        className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-md border text-xs font-semibold whitespace-nowrap transition-colors cursor-pointer ${
+          item.discountType !== 'none'
+            ? 'border-red-200 bg-red-50 text-red-600'
+            : 'border-gray-200 bg-gray-50 text-gray-600 hover:bg-gray-100'
+        }`}
       >
         <Tag size={11} />
         {discountLabel()}
         <ChevronDown
           size={11}
-          style={{ transform: open ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s' }}
+          className={`transition-transform duration-150 ${open ? 'rotate-180' : ''}`}
         />
       </button>
 
       {open && (
         <>
-          <div style={{ position: 'fixed', inset: 0, zIndex: 49 }} onClick={() => setOpen(false)} />
-          <div
-            style={{
-              position: 'absolute',
-              top: '100%',
-              left: 0,
-              zIndex: 50,
-              marginTop: '4px',
-              background: '#fff',
-              border: '1px solid #e5e7eb',
-              borderRadius: '10px',
-              boxShadow: '0 8px 24px rgba(0,0,0,0.12)',
-              padding: '12px',
-              width: '220px',
-            }}
-          >
-            <div
-              style={{
-                fontSize: '11px',
-                fontWeight: 700,
-                color: '#6b7280',
-                marginBottom: '8px',
-                letterSpacing: '0.5px',
-                textTransform: 'uppercase',
-              }}
-            >
+          <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
+          <div className="absolute top-full left-0 z-50 mt-1 bg-white border border-gray-200 rounded-xl shadow-xl p-3 w-56">
+            <div className="text-[11px] font-bold text-gray-500 mb-2 tracking-wider uppercase">
               Discount Type
             </div>
             {[
@@ -164,38 +131,31 @@ const DiscountControl = ({ item, onChange }) => {
             ].map((opt) => (
               <label
                 key={opt.val}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  padding: '6px 4px',
-                  cursor: 'pointer',
-                  borderRadius: '5px',
-                  fontSize: '13px',
-                  color: item.discountType === opt.val ? '#15527A' : '#374151',
-                  background: item.discountType === opt.val ? '#eff6ff' : 'transparent',
-                }}
+                className={`flex items-center gap-2 px-2 py-1.5 rounded cursor-pointer text-xs transition-colors ${
+                  item.discountType === opt.val
+                    ? 'bg-navy-50 text-navy font-semibold'
+                    : 'text-gray-700 hover:bg-gray-50'
+                }`}
               >
                 <input
                   type="radio"
                   name={`disc-type-${item.productId}`}
                   checked={item.discountType === opt.val}
                   onChange={() => handleTypeChange(opt.val)}
-                  style={{ accentColor: '#15527A' }}
+                  className="accent-navy"
                 />
                 {opt.label}
               </label>
             ))}
 
             {item.discountType !== 'none' && (
-              <div style={{ marginTop: '10px' }}>
-                <div style={{ fontSize: '11px', fontWeight: 700, color: '#6b7280', marginBottom: '5px' }}>
+              <div className="mt-2.5">
+                <div className="text-[11px] font-bold text-gray-500 mb-1">
                   {item.discountType === 'percent' ? 'Percentage (%)' : 'Amount (₹)'}
                 </div>
                 <input
                   type="number"
-                  className="form-control"
-                  style={{ fontSize: '13px', textAlign: 'right' }}
+                  className="form-control text-right text-xs"
                   min={0}
                   max={item.discountType === 'percent' ? 100 : undefined}
                   step={0.01}
@@ -209,8 +169,7 @@ const DiscountControl = ({ item, onChange }) => {
             <button
               type="button"
               onClick={() => setOpen(false)}
-              className="btn btn-primary full-width"
-              style={{ marginTop: '10px', justifyContent: 'center', fontSize: '12px', padding: '7px' }}
+              className="btn btn-primary w-full mt-3 justify-center text-xs py-1.5"
             >
               Apply
             </button>
@@ -455,12 +414,13 @@ const CreateInvoicePage = () => {
   return (
     <AppLayout title="Create Invoice">
       <form onSubmit={handlePreSubmit}>
-        <div className="page-header">
+        {/* Page Header */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5">
           <div>
-            <h1>Create Invoice</h1>
-            <p>Generate a professional billing invoice</p>
+            <h1 className="text-xl sm:text-2xl font-bold text-gray-900 tracking-tight">Create Invoice</h1>
+            <p className="text-xs sm:text-sm text-gray-500 mt-0.5">Generate a professional billing invoice</p>
           </div>
-          <div style={{ display: 'flex', gap: '10px' }}>
+          <div className="flex items-center gap-2.5">
             <button type="button" className="btn btn-outline" onClick={handleCancelPage}>
               Cancel
             </button>
@@ -470,10 +430,11 @@ const CreateInvoicePage = () => {
           </div>
         </div>
 
-        {/* Responsive Grid: collapses to 1 column on screens <= 900px */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '20px' }}>
+        {/* Responsive Grid: 1 column on mobile/tablet/laptop, 2 columns on xl (>= 1280px) */}
+        <div className="grid grid-cols-1 xl:grid-cols-[1fr_360px] gap-5 items-start">
           {/* ───── Left Main Column ───── */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', minWidth: 0 }}>
+          <div className="flex flex-col gap-5 min-w-0">
+
 
             {/* 1. Customer Card */}
             <div className="card">
@@ -506,35 +467,32 @@ const CreateInvoicePage = () => {
 
               <div className="card-body">
                 {!selectedCustomer ? (
-                  <div ref={customerSearchRef} style={{ position: 'relative' }}>
-                    <label className="form-label" style={{ fontWeight: 700, color: '#15527A', marginBottom: '8px' }}>
+                  <div ref={customerSearchRef} className="relative">
+                    <label className="form-label font-bold text-navy mb-2 block">
                       Customer Name <span className="required">*</span>
                     </label>
 
-                    <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-                      <div style={{ position: 'relative', flex: 1 }}>
+                    <div className="flex flex-col sm:flex-row gap-2.5 sm:items-center">
+                      <div className="relative flex-1">
                         <Search
                           size={15}
-                          color="#9ca3af"
-                          style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)' }}
+                          className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
                         />
                         <input
                           type="text"
-                          className="form-control"
+                          className="form-control pl-9 h-10 text-sm"
                           placeholder="Type customer name or mobile number to search..."
                           value={customerSearchQuery}
                           onChange={handleCustomerQueryChange}
                           onFocus={() => {
                             if (customerSearchQuery.trim()) setShowCustomerDropdown(true);
                           }}
-                          style={{ paddingLeft: '38px', height: '42px', fontSize: '13.5px' }}
                         />
                       </div>
 
                       <button
                         type="button"
-                        className="btn btn-outline"
-                        style={{ whiteSpace: 'nowrap', gap: '6px', height: '42px' }}
+                        className="btn btn-outline h-10 gap-1.5 shrink-0 justify-center whitespace-nowrap"
                         onClick={() => setShowCustomerModal(true)}
                       >
                         <UserPlus size={15} /> Add New
@@ -543,69 +501,30 @@ const CreateInvoicePage = () => {
 
                     {/* Auto-suggest dropdown */}
                     {showCustomerDropdown && (
-                      <div
-                        style={{
-                          position: 'absolute',
-                          top: '100%',
-                          left: 0,
-                          right: 0,
-                          zIndex: 60,
-                          marginTop: '4px',
-                          background: '#fff',
-                          border: '1px solid #e2e8f0',
-                          borderRadius: '10px',
-                          boxShadow: '0 12px 28px rgba(0,0,0,0.14)',
-                          maxHeight: '260px',
-                          overflowY: 'auto',
-                          padding: '6px',
-                        }}
-                      >
+                      <div className="absolute top-full left-0 right-0 z-50 mt-1 bg-white border border-slate-200 rounded-xl shadow-2xl max-h-64 overflow-y-auto p-1.5">
                         {customerSuggestions.length > 0 ? (
                           customerSuggestions.map((c) => (
                             <div
                               key={c._id}
                               onClick={() => handleSelectCustomer(c)}
-                              style={{
-                                padding: '10px 12px',
-                                borderRadius: '6px',
-                                cursor: 'pointer',
-                                borderBottom: '1px solid #f1f5f9',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'space-between',
-                              }}
-                              onMouseEnter={(e) => {
-                                e.currentTarget.style.background = '#f0f9ff';
-                              }}
-                              onMouseLeave={(e) => {
-                                e.currentTarget.style.background = 'transparent';
-                              }}
+                              className="p-2.5 rounded-lg cursor-pointer border-b border-slate-50 flex items-center justify-between hover:bg-sky-50 transition-colors"
                             >
                               <div>
-                                <div style={{ fontWeight: 700, fontSize: '13.5px', color: '#0f172a' }}>
+                                <div className="font-bold text-xs sm:text-sm text-slate-900">
                                   {c.name}
                                 </div>
-                                <div style={{ display: 'flex', gap: '10px', fontSize: '12px', color: '#64748b', marginTop: '2px' }}>
+                                <div className="flex flex-wrap gap-2 text-xs text-slate-500 mt-0.5">
                                   {c.phone && <span>📞 {c.phone}</span>}
                                   {c.gstin && <span>GSTIN: {c.gstin}</span>}
                                 </div>
                               </div>
-                              <span
-                                style={{
-                                  fontSize: '11px',
-                                  fontWeight: 700,
-                                  color: '#15527A',
-                                  background: '#e0f2fe',
-                                  padding: '3px 8px',
-                                  borderRadius: '5px',
-                                }}
-                              >
+                              <span className="text-[11px] font-bold text-navy bg-sky-100 px-2 py-0.5 rounded">
                                 Select
                               </span>
                             </div>
                           ))
                         ) : (
-                          <div style={{ padding: '16px', textAlign: 'center', fontSize: '13px', color: '#64748b' }}>
+                          <div className="p-4 text-center text-xs sm:text-sm text-slate-500">
                             {searchingCustomer ? (
                               'Searching customers...'
                             ) : (
@@ -613,8 +532,7 @@ const CreateInvoicePage = () => {
                                 <div>No customer found matching "{customerSearchQuery}"</div>
                                 <button
                                   type="button"
-                                  className="btn btn-primary btn-sm"
-                                  style={{ marginTop: '8px', fontSize: '12px' }}
+                                  className="btn btn-primary btn-sm mt-2 text-xs"
                                   onClick={() => setShowCustomerModal(true)}
                                 >
                                   <UserPlus size={13} /> Create "{customerSearchQuery}"
@@ -627,26 +545,26 @@ const CreateInvoicePage = () => {
                     )}
                   </div>
                 ) : (
-                  <div style={{ background: '#f0fdf4', border: '1.5px solid #86efac', borderRadius: '10px', padding: '14px 16px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
-                      <CheckCircle size={16} color="#16a34a" />
-                      <span style={{ fontSize: '11px', fontWeight: 700, color: '#16a34a', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                  <div className="bg-emerald-50 border border-emerald-300 rounded-xl p-3.5 sm:p-4">
+                    <div className="flex items-center gap-2 mb-2">
+                      <CheckCircle size={16} className="text-emerald-600 shrink-0" />
+                      <span className="text-[11px] font-bold text-emerald-700 uppercase tracking-wide">
                         Customer Selected
                       </span>
                     </div>
-                    <div style={{ fontWeight: 800, fontSize: '16px', color: '#111', marginBottom: '6px' }}>
+                    <div className="font-bold text-base text-gray-900 mb-1.5">
                       {selectedCustomer.name}
                     </div>
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '6px', fontSize: '12.5px', color: '#374151' }}>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 text-xs text-gray-700">
                       {selectedCustomer.phone && (
-                        <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                          <Phone size={12} color="#15527A" /> {selectedCustomer.phone}
+                        <span className="flex items-center gap-1.5">
+                          <Phone size={12} className="text-navy" /> {selectedCustomer.phone}
                         </span>
                       )}
-                      {selectedCustomer.email && <span style={{ color: '#6b7280' }}>✉ {selectedCustomer.email}</span>}
+                      {selectedCustomer.email && <span className="text-gray-500">✉ {selectedCustomer.email}</span>}
                       {selectedCustomer.gstin && <span>GSTIN: {selectedCustomer.gstin}</span>}
                       {selectedCustomer.address && (
-                        <span style={{ gridColumn: '1 / -1', color: '#6b7280' }}>
+                        <span className="col-span-full text-gray-500">
                           📍 {selectedCustomer.address.replace(/\n/g, ', ')}
                         </span>
                       )}
@@ -654,28 +572,25 @@ const CreateInvoicePage = () => {
                   </div>
                 )}
 
-                {/* 2. Business Type Selection (Replaces With/Without Tax) */}
-                <div style={{ marginTop: '20px', paddingTop: '16px', borderTop: '1px solid var(--border)' }}>
-                  <label className="form-label" style={{ fontWeight: 700, marginBottom: '10px', color: '#15527A', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                {/* 2. Business Type Selection */}
+                <div className="mt-5 pt-4 border-t border-gray-100">
+                  <label className="form-label font-bold mb-2.5 text-navy flex items-center gap-1.5">
                     <Building2 size={16} />
                     <span>Business Type <span className="required">*</span></span>
                   </label>
 
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     {/* Om Cartridge Option */}
                     <div
                       onClick={() => setBusinessType('OM_CARTRIDGE')}
-                      style={{
-                        padding: '12px 14px',
-                        borderRadius: '10px',
-                        border: `2px solid ${businessType === 'OM_CARTRIDGE' ? '#d97706' : '#e2e8f0'}`,
-                        background: businessType === 'OM_CARTRIDGE' ? '#fffbeb' : '#fff',
-                        cursor: 'pointer',
-                        transition: 'all 0.15s ease',
-                      }}
+                      className={`p-3.5 rounded-xl border-2 cursor-pointer transition-all ${
+                        businessType === 'OM_CARTRIDGE'
+                          ? 'border-amber-500 bg-amber-50 shadow-xs'
+                          : 'border-slate-200 bg-white hover:border-slate-300'
+                      }`}
                     >
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
-                        <div style={{ fontWeight: 800, fontSize: '14px', color: businessType === 'OM_CARTRIDGE' ? '#b45309' : '#1e293b' }}>
+                      <div className="flex items-center justify-between mb-1">
+                        <div className={`font-bold text-sm ${businessType === 'OM_CARTRIDGE' ? 'text-amber-800' : 'text-slate-800'}`}>
                           Om Cartridge
                         </div>
                         <input
@@ -683,13 +598,13 @@ const CreateInvoicePage = () => {
                           name="businessType"
                           checked={businessType === 'OM_CARTRIDGE'}
                           onChange={() => setBusinessType('OM_CARTRIDGE')}
-                          style={{ accentColor: '#d97706' }}
+                          className="accent-amber-600"
                         />
                       </div>
-                      <div style={{ fontSize: '12px', color: '#78350f', fontWeight: 600 }}>
+                      <div className="text-xs text-amber-700 font-semibold">
                         Without Tax (No GST)
                       </div>
-                      <div style={{ fontSize: '11px', color: '#92400e', marginTop: '4px' }}>
+                      <div className="text-[11px] text-amber-800/80 mt-1">
                         Standard retail invoice without GST tax addition.
                       </div>
                     </div>
@@ -697,17 +612,14 @@ const CreateInvoicePage = () => {
                     {/* Om Enterprise Option */}
                     <div
                       onClick={() => setBusinessType('OM_ENTERPRISE')}
-                      style={{
-                        padding: '12px 14px',
-                        borderRadius: '10px',
-                        border: `2px solid ${businessType === 'OM_ENTERPRISE' ? '#15527A' : '#e2e8f0'}`,
-                        background: businessType === 'OM_ENTERPRISE' ? '#eff6ff' : '#fff',
-                        cursor: 'pointer',
-                        transition: 'all 0.15s ease',
-                      }}
+                      className={`p-3.5 rounded-xl border-2 cursor-pointer transition-all ${
+                        businessType === 'OM_ENTERPRISE'
+                          ? 'border-navy bg-navy-50 shadow-xs'
+                          : 'border-slate-200 bg-white hover:border-slate-300'
+                      }`}
                     >
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
-                        <div style={{ fontWeight: 800, fontSize: '14px', color: businessType === 'OM_ENTERPRISE' ? '#15527A' : '#1e293b' }}>
+                      <div className="flex items-center justify-between mb-1">
+                        <div className={`font-bold text-sm ${businessType === 'OM_ENTERPRISE' ? 'text-navy' : 'text-slate-800'}`}>
                           Om Enterprise
                         </div>
                         <input
@@ -715,13 +627,13 @@ const CreateInvoicePage = () => {
                           name="businessType"
                           checked={businessType === 'OM_ENTERPRISE'}
                           onChange={() => setBusinessType('OM_ENTERPRISE')}
-                          style={{ accentColor: '#15527A' }}
+                          className="accent-navy"
                         />
                       </div>
-                      <div style={{ fontSize: '12px', color: '#1e40af', fontWeight: 600 }}>
+                      <div className="text-xs text-blue-700 font-semibold">
                         With Tax (GST Invoice)
                       </div>
-                      <div style={{ fontSize: '11px', color: '#1e3a8a', marginTop: '4px' }}>
+                      <div className="text-[11px] text-blue-900/80 mt-1">
                         Full tax invoice with CGST/SGST or IGST.
                       </div>
                     </div>
@@ -729,19 +641,19 @@ const CreateInvoicePage = () => {
 
                   {/* Interstate option when Om Enterprise is selected */}
                   {businessType === 'OM_ENTERPRISE' ? (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '12px', padding: '8px 12px', background: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
-                      <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '13px' }}>
+                    <div className="flex items-center gap-2 mt-3 p-2.5 bg-slate-50 rounded-lg border border-slate-200">
+                      <label className="flex items-center gap-2 cursor-pointer text-xs sm:text-sm text-gray-700">
                         <input
                           type="checkbox"
                           checked={isInterState}
                           onChange={(e) => setIsInterState(e.target.checked)}
-                          style={{ accentColor: '#15527A' }}
+                          className="accent-navy"
                         />
                         <span>Interstate Transaction (Apply <strong>IGST</strong> instead of CGST + SGST)</span>
                       </label>
                     </div>
                   ) : (
-                    <div style={{ fontSize: '12px', color: '#92400e', background: '#fffbeb', padding: '8px 12px', borderRadius: '8px', border: '1px solid #fde68a', marginTop: '12px' }}>
+                    <div className="text-xs text-amber-900 bg-amber-50 p-2.5 rounded-lg border border-amber-200 mt-3 leading-relaxed">
                       ℹ <strong>Om Cartridge Mode:</strong> GST is NOT applied to this invoice (Total Tax = ₹0.00).
                     </div>
                   )}
@@ -983,10 +895,11 @@ const CreateInvoicePage = () => {
           </div>
 
           {/* ───── Right Column - Summary & Actions ───── */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', minWidth: '280px', maxWidth: '400px' }}>
-            <div className="card" style={{ position: 'sticky', top: '20px' }}>
-              <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div className="w-full flex flex-col gap-4 xl:sticky xl:top-5">
+            <div className="card overflow-hidden">
+              <div className="card-header">
                 <div className="card-title">Summary</div>
+
                 <span
                   style={{
                     padding: '3px 10px',
