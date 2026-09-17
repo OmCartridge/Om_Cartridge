@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
-import { Download, Mail, Printer, ArrowLeft, CheckCircle } from 'lucide-react';
+import { Download, Mail, Printer, ArrowLeft, CheckCircle, ZoomIn, ZoomOut } from 'lucide-react';
 import AppLayout from '../layouts/AppLayout';
 import api from '../services/api';
 import toast from 'react-hot-toast';
@@ -16,6 +16,54 @@ const InvoiceViewPage = () => {
   const [loading, setLoading] = useState(true);
   const [emailing, setEmailing] = useState(false);
   const [downloading, setDownloading] = useState(false);
+
+  // Responsive scaling for mobile viewports
+  const containerRef = useRef(null);
+  const templateRef = useRef(null);
+  const [scale, setScale] = useState(1);
+  const [isZoomed, setIsZoomed] = useState(false);
+  const [docHeight, setDocHeight] = useState(0);
+  const [isMobileScreen, setIsMobileScreen] = useState(false);
+
+  useEffect(() => {
+    const updateDimensions = () => {
+      if (!containerRef.current) return;
+      const containerWidth = containerRef.current.clientWidth;
+      const isMobile = containerWidth < 830;
+      setIsMobileScreen(isMobile);
+
+      if (templateRef.current) {
+        setDocHeight(templateRef.current.offsetHeight);
+      }
+
+      if (isMobile && !isZoomed) {
+        // Fits comfortably within container with padding
+        const calculatedScale = Math.min(1, Math.max(0.25, (containerWidth - 12) / 820));
+        setScale(calculatedScale);
+      } else {
+        setScale(1);
+      }
+    };
+
+    updateDimensions();
+
+    const resizeObserver = new ResizeObserver(() => {
+      updateDimensions();
+    });
+
+    if (containerRef.current) {
+      resizeObserver.observe(containerRef.current);
+    }
+    if (templateRef.current) {
+      resizeObserver.observe(templateRef.current);
+    }
+
+    window.addEventListener('resize', updateDimensions);
+    return () => {
+      resizeObserver.disconnect();
+      window.removeEventListener('resize', updateDimensions);
+    };
+  }, [invoice, isZoomed]);
 
   useEffect(() => {
     api.get(`/invoices/${id}`)
@@ -131,7 +179,28 @@ const InvoiceViewPage = () => {
         >
           {isWithoutTax ? 'Om Cartridge (Without Tax)' : 'Om Enterprise (Tax Invoice)'}
         </span>
-        <div className="flex-1 min-w-[20px]" />
+
+        {/* Zoom / Fit to Screen control for mobile */}
+        {isMobileScreen && (
+          <button
+            type="button"
+            className="btn btn-outline btn-sm gap-1.5 text-xs print:hidden"
+            onClick={() => setIsZoomed(!isZoomed)}
+            title={isZoomed ? 'Fit invoice to screen' : 'View full size with horizontal scroll'}
+          >
+            {isZoomed ? (
+              <>
+                <ZoomOut size={14} className="text-navy" /> Fit Screen
+              </>
+            ) : (
+              <>
+                <ZoomIn size={14} className="text-navy" /> Full Size
+              </>
+            )}
+          </button>
+        )}
+
+        <div className="flex-1 min-w-[10px]" />
         <button
           type="button"
           className="btn btn-outline btn-sm sm:btn-md gap-1.5"
@@ -159,13 +228,37 @@ const InvoiceViewPage = () => {
         )}
       </div>
 
-      {/* CANONICAL MASTER INVOICE TEMPLATE (Wrapped in horizontal scroll container for mobile responsiveness) */}
-      <div className="w-full overflow-x-auto pb-8">
-        <InvoiceTemplate invoice={invoice} />
+      {/* CANONICAL MASTER INVOICE: Automatically scales to fit mobile screens without overflow */}
+      <div
+        ref={containerRef}
+        className="w-full pb-8 flex flex-col items-center overflow-x-auto"
+      >
+        <div
+          className="invoice-scale-wrapper"
+          style={{
+            width: scale < 1 ? `${Math.round(820 * scale)}px` : '100%',
+            maxWidth: '820px',
+            height: scale < 1 && docHeight ? `${Math.round(docHeight * scale)}px` : 'auto',
+            overflow: scale < 1 ? 'hidden' : 'visible',
+            position: 'relative',
+            margin: '0 auto',
+          }}
+        >
+          <div
+            ref={templateRef}
+            className="invoice-scale-inner"
+            style={{
+              width: '820px',
+              transform: scale < 1 ? `scale(${scale})` : 'none',
+              transformOrigin: 'top left',
+            }}
+          >
+            <InvoiceTemplate invoice={invoice} />
+          </div>
+        </div>
       </div>
     </AppLayout>
   );
 };
-
 
 export default InvoiceViewPage;

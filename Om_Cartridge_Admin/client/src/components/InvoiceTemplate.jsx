@@ -34,6 +34,7 @@ const InvoiceTemplate = ({ invoice }) => {
         background: '#fff',
         border: '2px solid #222',
         maxWidth: '820px',
+        minWidth: '780px',
         margin: '0 auto',
         fontFamily: 'Arial, sans-serif',
         fontSize: '11px',

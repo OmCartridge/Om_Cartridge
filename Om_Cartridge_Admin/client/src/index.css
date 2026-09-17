@@ -516,12 +516,25 @@
 
   #invoice-preview {
     max-width: 100% !important;
+    min-width: 0 !important;
     width: 100% !important;
     margin: 0 auto !important;
     border: 1.5px solid #000 !important;
     box-shadow: none !important;
     page-break-inside: avoid;
     font-size: 9.5pt !important;
+  }
+
+  .invoice-scale-wrapper {
+    width: 100% !important;
+    height: auto !important;
+    overflow: visible !important;
+  }
+
+  .invoice-scale-inner {
+    transform: none !important;
+    width: 100% !important;
+    height: auto !important;
   }
 
   #invoice-preview table {

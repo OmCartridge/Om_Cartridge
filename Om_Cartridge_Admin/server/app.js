@@ -29,7 +29,7 @@ app.use(
   })
 );
 
-// ── CORS — strict production allowlist ───────────────────────────────────────
+// ── CORS — strict production allowlist + localhost support ──────────────────────
 const productionOrigins = [
   process.env.FRONTEND_URL, // e.g. https://om-cartridge.vercel.app
 ].filter(Boolean);
@@ -38,11 +38,18 @@ const developmentOrigins = [
   'http://localhost:5173',
   'http://127.0.0.1:5173',
   'http://localhost:5001',
+  'http://127.0.0.1:5001',
+  'http://localhost:3000',
+  'http://127.0.0.1:3000',
 ];
+
+const isLocalhostOrigin = (origin) => {
+  return /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin);
+};
 
 const allowedOrigins =
   process.env.NODE_ENV === 'production'
-    ? productionOrigins
+    ? [...productionOrigins, ...developmentOrigins]
     : [...productionOrigins, ...developmentOrigins];
 
 app.use(
@@ -51,7 +58,7 @@ app.use(
       // Allow server-to-server / same-origin requests (no Origin header)
       if (!origin) return callback(null, true);
 
-      if (allowedOrigins.includes(origin)) {
+      if (allowedOrigins.includes(origin) || isLocalhostOrigin(origin)) {
         return callback(null, true);
       }
 
