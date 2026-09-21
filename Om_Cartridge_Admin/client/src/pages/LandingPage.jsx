@@ -1,13 +1,13 @@
 import { Link } from 'react-router-dom';
-import { 
-  Printer, 
-  Sparkles, 
-  Phone, 
-  MapPin, 
-  ArrowRight, 
-  Lock, 
-  CheckCircle2, 
-  Zap, 
+import {
+  Printer,
+  Sparkles,
+  Phone,
+  MapPin,
+  ArrowRight,
+  Lock,
+  CheckCircle2,
+  Zap,
   ShieldCheck,
   PackageCheck
 } from 'lucide-react';
@@ -24,10 +24,10 @@ const LandingPage = () => {
       {/* Top Navbar */}
       <header className="relative z-10 w-full max-w-7xl mx-auto px-6 py-5 flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <img 
-            src={heroImg} 
-            alt="OM Cartridge Logo" 
-            className="w-10 h-10 object-contain drop-shadow-md" 
+          <img
+            src={heroImg}
+            alt="OM Cartridge Logo"
+            className="w-10 h-10 object-contain drop-shadow-md"
           />
           <div>
             <span className="font-extrabold text-base tracking-wider text-white">OM CARTRIDGE</span>
@@ -38,14 +38,14 @@ const LandingPage = () => {
         </div>
 
         {/* Discreet Admin Login Access */}
-        <Link 
+        {/* <Link 
           to="/login" 
           className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-slate-300 hover:text-white bg-slate-900/80 hover:bg-slate-800 border border-slate-800 hover:border-slate-700 transition shadow-sm"
           title="Admin Panel Login"
         >
           <Lock size={13} className="text-slate-400" />
           <span>Admin Login</span>
-        </Link>
+        </Link> */}
       </header>
 
       {/* Hero Section */}
@@ -60,10 +60,10 @@ const LandingPage = () => {
         <div className="relative mb-6">
           <div className="absolute inset-0 bg-gradient-to-tr from-[#15527A]/40 to-red-500/30 rounded-3xl blur-xl" />
           <div className="relative bg-slate-900/90 border border-slate-800 p-5 rounded-2xl shadow-2xl">
-            <img 
-              src={heroImg} 
-              alt="OM Cartridge" 
-              className="w-24 h-24 sm:w-28 sm:h-28 object-contain drop-shadow-lg" 
+            <img
+              src={heroImg}
+              alt="OM Cartridge"
+              className="w-24 h-24 sm:w-28 sm:h-28 object-contain drop-shadow-lg"
             />
           </div>
         </div>
@@ -77,7 +77,7 @@ const LandingPage = () => {
         </h1>
 
         <p className="mt-4 sm:mt-5 text-sm sm:text-lg text-slate-300 max-w-2xl font-normal leading-relaxed">
-          We are upgrading our digital experience to provide fast toner supply, 
+          We are upgrading our digital experience to provide fast toner supply,
           precision laser cartridge refilling, and quick deliveries for businesses and home offices.
         </p>
 
@@ -123,8 +123,8 @@ const LandingPage = () => {
               <span>+91 70967 06868 &nbsp;/&nbsp; +91 70967 06363</span>
             </div>
           </div>
-          <a 
-            href="tel:+917096706868" 
+          <a
+            href="tel:+917096706868"
             className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-red-600 hover:bg-red-500 text-white font-medium text-xs sm:text-sm inline-flex items-center justify-center gap-2 transition shadow-lg shadow-red-600/20"
           >
             <span>Call Now</span>
@@ -146,10 +146,10 @@ const LandingPage = () => {
           </div>
 
           <div>
-            <Link to="/login" className="text-slate-400 hover:text-white transition flex items-center gap-1">
+            {/* <Link to="/login" className="text-slate-400 hover:text-white transition flex items-center gap-1">
               <ShieldCheck size={14} />
               <span>Admin Portal (/login)</span>
-            </Link>
+            </Link> */}
           </div>
         </div>
       </footer>
