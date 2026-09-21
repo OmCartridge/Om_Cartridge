@@ -78,11 +78,11 @@ const LandingPage = () => {
 
         <p className="mt-4 sm:mt-5 text-sm sm:text-lg text-slate-300 max-w-2xl font-normal leading-relaxed">
           We are upgrading our digital experience to provide fast toner supply,
-          precision laser cartridge refilling, and quick deliveries for businesses and home offices.
+          precision laser cartridge and quick deliveries for businesses and home offices.
         </p>
 
         {/* Feature Highlights Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-12 w-full max-w-4xl text-left">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-12 w-full max-w-3xl text-left">
           <div className="p-5 rounded-xl bg-slate-900/70 border border-slate-800/80 backdrop-blur-sm hover:border-slate-700 transition">
             <div className="w-10 h-10 rounded-lg bg-[#15527A]/30 border border-[#15527A]/40 flex items-center justify-center text-[#4da8e0] mb-3">
               <Printer size={20} />
@@ -93,7 +93,7 @@ const LandingPage = () => {
             </p>
           </div>
 
-          <div className="p-5 rounded-xl bg-slate-900/70 border border-slate-800/80 backdrop-blur-sm hover:border-slate-700 transition">
+          {/* <div className="p-5 rounded-xl bg-slate-900/70 border border-slate-800/80 backdrop-blur-sm hover:border-slate-700 transition">
             <div className="w-10 h-10 rounded-lg bg-red-500/10 border border-red-500/20 flex items-center justify-center text-red-400 mb-3">
               <Zap size={20} />
             </div>
@@ -101,7 +101,7 @@ const LandingPage = () => {
             <p className="text-xs sm:text-sm text-slate-400 mt-1">
               High-density toner refills, drum replacement, and reliable printer maintenance.
             </p>
-          </div>
+          </div> */}
 
           <div className="p-5 rounded-xl bg-slate-900/70 border border-slate-800/80 backdrop-blur-sm hover:border-slate-700 transition">
             <div className="w-10 h-10 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 mb-3">
