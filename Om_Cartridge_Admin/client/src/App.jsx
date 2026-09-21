@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import LoginPage from './pages/LoginPage';
+import LandingPage from './pages/LandingPage';
 import DashboardPage from './pages/DashboardPage';
 import StockPage from './pages/StockPage';
 import CustomersPage from './pages/CustomersPage';
@@ -36,6 +37,7 @@ const PublicRoute = ({ children }) => {
 function AppRoutes() {
   return (
     <Routes>
+      <Route path="/" element={<LandingPage />} />
       <Route path="/login" element={<PublicRoute><LoginPage /></PublicRoute>} />
       <Route path="/dashboard" element={<ProtectedRoute><DashboardPage /></ProtectedRoute>} />
       <Route path="/stock" element={<ProtectedRoute><StockPage /></ProtectedRoute>} />
@@ -44,8 +46,7 @@ function AppRoutes() {
       <Route path="/invoices/:id" element={<ProtectedRoute><InvoiceViewPage /></ProtectedRoute>} />
       <Route path="/invoices" element={<ProtectedRoute><InvoicesPage /></ProtectedRoute>} />
       <Route path="/settings" element={<ProtectedRoute><SettingsPage /></ProtectedRoute>} />
-      <Route path="/" element={<Navigate to="/dashboard" replace />} />
-      <Route path="*" element={<Navigate to="/dashboard" replace />} />
+      <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );
 }
