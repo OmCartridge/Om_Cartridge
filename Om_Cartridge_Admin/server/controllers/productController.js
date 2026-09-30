@@ -52,15 +52,67 @@ const getProduct = async (req, res, next) => {
   }
 };
 
+const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+const MAX_IMAGE_SIZE_BYTES = 5 * 1024 * 1024; // 5MB
+
+const validateImage = (imageUrl) => {
+  if (!imageUrl || typeof imageUrl !== 'string') return null;
+  const trimmed = imageUrl.trim();
+  if (!trimmed) return null;
+
+  if (trimmed.startsWith('data:')) {
+    const match = trimmed.match(/^data:([a-zA-Z0-9]+\/[a-zA-Z0-9-.+]+);base64,/);
+    if (!match) return 'Invalid image format.';
+    const mimeType = match[1].toLowerCase();
+    if (!ALLOWED_IMAGE_TYPES.includes(mimeType)) {
+      return 'Invalid image format.';
+    }
+    const base64Data = trimmed.slice(match[0].length);
+    const byteSize = Math.round((base64Data.length * 3) / 4);
+    if (byteSize > MAX_IMAGE_SIZE_BYTES) {
+      return 'Image size is too large.';
+    }
+    return null;
+  }
+
+  const lower = trimmed.toLowerCase();
+  const validExtensions = ['.jpg', '.jpeg', '.png', '.webp'];
+  const hasValidExt = validExtensions.some((ext) => lower.includes(ext));
+  if (!hasValidExt && !lower.startsWith('/uploads/')) {
+    return 'Invalid image format.';
+  }
+
+  return null;
+};
+
 // POST /api/products
 const createProduct = async (req, res, next) => {
   try {
-    const { name, sku, hsnSac, description, quantity, unit, purchaseRate, sellingRate, gstRate, minimumStock, isActive } = req.body;
+    const {
+      name,
+      sku,
+      hsnSac,
+      description,
+      quantity,
+      unit,
+      purchaseRate,
+      sellingRate,
+      gstRate,
+      minimumStock,
+      isActive,
+      imageUrl,
+      displayOnWebsite,
+    } = req.body;
 
     if (!name || !name.trim()) return res.status(400).json({ success: false, message: 'Product name is required' });
     if (!sku || !sku.trim()) return res.status(400).json({ success: false, message: 'SKU is required' });
     if (sellingRate < 0) return res.status(400).json({ success: false, message: 'Selling rate cannot be negative' });
     if (quantity < 0) return res.status(400).json({ success: false, message: 'Quantity cannot be negative' });
+
+    if (imageUrl) {
+      const imgError = validateImage(imageUrl);
+      if (imgError) return res.status(400).json({ success: false, message: imgError });
+    }
 
     const product = await Product.create({
       name: name.trim(),
@@ -74,6 +126,8 @@ const createProduct = async (req, res, next) => {
       gstRate: gstRate || 18,
       minimumStock: minimumStock || 5,
       isActive: isActive !== undefined ? isActive : true,
+      imageUrl: imageUrl ? imageUrl.trim() : '',
+      displayOnWebsite: displayOnWebsite !== undefined ? Boolean(displayOnWebsite) : false,
     });
 
     // Record initial stock movement if quantity > 0
@@ -102,7 +156,28 @@ const updateProduct = async (req, res, next) => {
     const product = await Product.findById(req.params.id);
     if (!product) return res.status(404).json({ success: false, message: 'Product not found' });
 
-    const { name, sku, hsnSac, description, unit, purchaseRate, sellingRate, gstRate, minimumStock, isActive } = req.body;
+    const {
+      name,
+      sku,
+      hsnSac,
+      description,
+      unit,
+      purchaseRate,
+      sellingRate,
+      gstRate,
+      minimumStock,
+      isActive,
+      imageUrl,
+      displayOnWebsite,
+    } = req.body;
+
+    if (imageUrl !== undefined) {
+      if (imageUrl) {
+        const imgError = validateImage(imageUrl);
+        if (imgError) return res.status(400).json({ success: false, message: imgError });
+      }
+      product.imageUrl = imageUrl ? imageUrl.trim() : '';
+    }
 
     if (name !== undefined) product.name = name.trim();
     if (sku !== undefined) product.sku = sku.trim().toUpperCase();
@@ -114,6 +189,7 @@ const updateProduct = async (req, res, next) => {
     if (gstRate !== undefined) product.gstRate = gstRate;
     if (minimumStock !== undefined) product.minimumStock = minimumStock;
     if (isActive !== undefined) product.isActive = isActive;
+    if (displayOnWebsite !== undefined) product.displayOnWebsite = Boolean(displayOnWebsite);
 
     await product.save();
     res.json({ success: true, message: 'Product updated successfully', data: product });
@@ -304,6 +380,78 @@ const importProductsCSV = async (req, res, next) => {
   }
 };
 
+// POST /api/products/upload-image
+const uploadProductImage = async (req, res, next) => {
+  try {
+    const { image } = req.body;
+    if (!image) {
+      return res.status(400).json({ success: false, message: 'Invalid image format.' });
+    }
+
+    const error = validateImage(image);
+    if (error) {
+      return res.status(400).json({ success: false, message: error });
+    }
+
+    res.json({
+      success: true,
+      message: 'Image processed successfully',
+      imageUrl: image.trim(),
+    });
+  } catch (error) {
+    res.status(400).json({ success: false, message: 'Unable to upload image.' });
+  }
+};
+
+// GET /api/products/public
+const getPublicProducts = async (req, res, next) => {
+  try {
+    const { search } = req.query;
+    const filter = {
+      isActive: true,
+      displayOnWebsite: true,
+    };
+
+    if (search) {
+      filter.$or = [
+        { name: { $regex: search, $options: 'i' } },
+        { description: { $regex: search, $options: 'i' } },
+        { sku: { $regex: search, $options: 'i' } },
+      ];
+    }
+
+    const products = await Product.find(filter)
+      .select('name sku description unit sellingRate gstRate imageUrl displayOnWebsite')
+      .sort({ createdAt: -1 })
+      .lean();
+
+    res.json({ success: true, data: products });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// GET /api/products/public/:id
+const getPublicProduct = async (req, res, next) => {
+  try {
+    const product = await Product.findOne({
+      _id: req.params.id,
+      isActive: true,
+      displayOnWebsite: true,
+    })
+      .select('name sku description unit sellingRate gstRate imageUrl displayOnWebsite')
+      .lean();
+
+    if (!product) {
+      return res.status(404).json({ success: false, message: 'Product not found or not available publicly' });
+    }
+
+    res.json({ success: true, data: product });
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   getProducts,
   getProduct,
@@ -314,4 +462,7 @@ module.exports = {
   getStockMovements,
   getLowStockProducts,
   importProductsCSV,
+  uploadProductImage,
+  getPublicProducts,
+  getPublicProduct,
 };

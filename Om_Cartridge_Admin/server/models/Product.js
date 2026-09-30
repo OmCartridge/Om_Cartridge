@@ -13,6 +13,8 @@ const productSchema = new mongoose.Schema(
     gstRate: { type: Number, required: true, default: 18, enum: [0, 5, 12, 18, 28] },
     minimumStock: { type: Number, default: 5, min: 0 },
     isActive: { type: Boolean, default: true },
+    imageUrl: { type: String, trim: true, default: '' },
+    displayOnWebsite: { type: Boolean, default: false },
   },
   { timestamps: true }
 );

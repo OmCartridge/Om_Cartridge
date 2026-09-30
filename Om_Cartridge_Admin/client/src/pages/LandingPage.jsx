@@ -43,90 +43,38 @@ import {
   Tag
 } from 'lucide-react';
 import heroImg from '../assets/hero.png';
+import api from '../services/api';
 
-// E-commerce Demo Products Catalog
-const DEMO_PRODUCTS = [
-  {
-    id: 'prod-1',
-    name: 'Premium Black Cartridge',
-    category: 'Laser Cartridge',
-    categorySlug: 'laser',
-    description: 'High-quality cartridge for consistent professional printing.',
-    price: '₹1,499',
-    rawPrice: 1499,
-    originalPrice: '₹2,199',
-    discount: '32% OFF',
-    rating: 4.9,
-    reviewsCount: 128,
-    badge: 'Bestseller',
-    badgeColor: 'bg-red-600 text-white',
-    yield: '2,600 Pages (at 5% coverage)',
-    compatibility: 'HP LaserJet Pro M402, M404, M428 & Canon LBP 214dw / 226dw',
-    features: ['High-density micro-toner', 'Smudge-resistant matte finish', 'OEM-grade smart microchip'],
-    accent: '#15527A',
-    stock: 'In Stock (Ready to Ship)'
-  },
-  {
-    id: 'prod-2',
-    name: 'Office Pro Cartridge',
-    category: 'Office Printing',
-    categorySlug: 'office',
-    description: 'Reliable printing solution for everyday office requirements.',
-    price: '₹1,899',
-    rawPrice: 1899,
-    originalPrice: '₹2,699',
-    discount: '30% OFF',
-    rating: 4.8,
-    reviewsCount: 94,
-    badge: 'Corporate Choice',
-    badgeColor: 'bg-[#15527A] text-white',
-    yield: '3,800 Pages (Heavy Duty Cycle)',
-    compatibility: 'HP LaserJet Enterprise M506, M527, Canon ImageClass LBP series',
-    features: ['Engineered for high-volume duty', 'Zero ghosting drum technology', 'Extended roller lifespan'],
-    accent: '#ED3838',
-    stock: 'In Stock (Bulk Supply Available)'
-  },
-  {
-    id: 'prod-3',
-    name: 'High Yield Toner',
-    category: 'High Yield',
-    categorySlug: 'high-yield',
-    description: 'Higher page yield with sharp and consistent output.',
-    price: '₹2,299',
-    rawPrice: 2299,
-    originalPrice: '₹3,299',
-    discount: '30% OFF',
-    rating: 5.0,
-    reviewsCount: 76,
-    badge: 'Max Capacity',
-    badgeColor: 'bg-emerald-600 text-white',
-    yield: '6,500 Pages (Ultra-Extended Yield)',
-    compatibility: 'Heavy-duty corporate printers HP Enterprise, Ricoh, Brother',
-    features: ['Extra-capacity toner reservoir', 'Deep jet-black pigment formulation', '99.8% transfer efficiency'],
-    accent: '#0284c7',
-    stock: 'In Stock (Fast Gujarat Delivery)'
-  },
-  {
-    id: 'prod-4',
-    name: 'Eco Print Cartridge',
-    category: 'Eco Series',
-    categorySlug: 'eco',
-    description: 'Efficient printing solution designed for responsible usage.',
-    price: '₹1,299',
-    rawPrice: 1299,
-    originalPrice: '₹1,899',
-    discount: '31% OFF',
-    rating: 4.7,
-    reviewsCount: 62,
-    badge: 'Eco Series',
-    badgeColor: 'bg-teal-600 text-white',
-    yield: '2,200 Pages (Green Certified)',
-    compatibility: 'Compact home & SME laser printers (HP 1020, 1005, Canon 2900)',
-    features: ['Recycled polymers shell', 'Low-melt temperature energy saving', 'Non-toxic toner grade'],
-    accent: '#059669',
-    stock: 'In Stock (Eco-Friendly Pack)'
-  }
-];
+// Public Product Formatter
+const formatPublicProduct = (p) => ({
+  id: p._id,
+  _id: p._id,
+  name: p.name,
+  category: p.unit ? `${p.unit} Supply` : 'Laser Cartridge',
+  categorySlug: (p.unit || 'laser').toLowerCase(),
+  description: p.description || 'Reliable printing solution for professional and office requirements.',
+  price: `₹${Number(p.sellingRate || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`,
+  rawPrice: Number(p.sellingRate || 0),
+  originalPrice: p.sellingRate ? `₹${Math.round(p.sellingRate * 1.35).toLocaleString('en-IN')}` : '',
+  discount: 'Direct Rate',
+  rating: 4.9,
+  reviewsCount: 88,
+  badge: '100% Genuine',
+  badgeColor: 'bg-[#15527A] text-white',
+  yield: 'OEM Standard Yield',
+  compatibility: 'HP, Canon, Brother & Multi-brand Laser Printers',
+  features: [
+    'High-density micro-toner formulation',
+    'Smudge-resistant matte finish',
+    'Tested for printer engine compatibility'
+  ],
+  accent: '#15527A',
+  stock: 'In Stock (Gujarat Ready)',
+  imageUrl: p.imageUrl || '',
+  sku: p.sku || '',
+  unit: p.unit || 'PCS',
+  gstRate: p.gstRate || 18,
+});
 
 // Interactive 3D Product Tilt Card with Scroll Reveal
 const EcommerceProductCard = ({ product, onQuickView, onAddToCart }) => {
@@ -212,41 +160,57 @@ const EcommerceProductCard = ({ product, onQuickView, onAddToCart }) => {
           <Eye size={15} />
         </button>
 
-        {/* 3D Visual Representation of Cartridge */}
-        <div
-          className="relative w-48 h-28 flex items-center justify-center transition-transform duration-300 group-hover:scale-105"
-          style={{
-            transform: `translateZ(20px) rotateY(${rotate.y * 0.8}deg)`
-          }}
-        >
-          {/* Soft Shadow Beneath Cartridge */}
-          <div className="absolute -bottom-2 w-36 h-4 bg-slate-900/15 rounded-full blur-md group-hover:scale-110 transition-transform" />
+        {/* Visual: Uploaded Photograph or 3D Cartridge Model */}
+        {product.imageUrl ? (
+          <div
+            className="relative w-full h-full flex items-center justify-center p-3 transition-transform duration-300 group-hover:scale-105"
+            style={{
+              transform: `translateZ(20px) rotateY(${rotate.y * 0.8}deg)`
+            }}
+          >
+            <img
+              src={product.imageUrl}
+              alt={product.name}
+              className="max-h-40 max-w-[85%] object-contain drop-shadow-md rounded-lg"
+              loading="lazy"
+            />
+          </div>
+        ) : (
+          <div
+            className="relative w-48 h-28 flex items-center justify-center transition-transform duration-300 group-hover:scale-105"
+            style={{
+              transform: `translateZ(20px) rotateY(${rotate.y * 0.8}deg)`
+            }}
+          >
+            {/* Soft Shadow Beneath Cartridge */}
+            <div className="absolute -bottom-2 w-36 h-4 bg-slate-900/15 rounded-full blur-md group-hover:scale-110 transition-transform" />
 
-          {/* Cartridge Outer Shell */}
-          <div className="relative w-44 h-22 bg-gradient-to-r from-slate-800 via-slate-900 to-slate-850 rounded-xl border border-slate-700 shadow-lg flex items-center justify-between p-2.5">
-            {/* OPC Drum Cyan Roller */}
-            <div className="w-10 h-16 rounded-md bg-gradient-to-b from-teal-500 via-emerald-400 to-teal-700 shadow-inner border border-emerald-300/40 relative overflow-hidden flex-shrink-0">
-              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/40 to-transparent w-8 animate-shimmer" />
-            </div>
-
-            {/* Inner Details */}
-            <div className="flex-1 px-2.5 text-left">
-              <div className="flex items-center gap-1.5">
-                <img src={heroImg} alt="OM" className="w-4 h-4 object-contain" />
-                <span className="text-[10px] font-black text-white tracking-wide">OM LASER</span>
+            {/* Cartridge Outer Shell */}
+            <div className="relative w-44 h-22 bg-gradient-to-r from-slate-800 via-slate-900 to-slate-850 rounded-xl border border-slate-700 shadow-lg flex items-center justify-between p-2.5">
+              {/* OPC Drum Cyan Roller */}
+              <div className="w-10 h-16 rounded-md bg-gradient-to-b from-teal-500 via-emerald-400 to-teal-700 shadow-inner border border-emerald-300/40 relative overflow-hidden flex-shrink-0">
+                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/40 to-transparent w-8 animate-shimmer" />
               </div>
-              <div className="text-[9px] text-slate-300 font-mono mt-1">{product.yield.split(' ')[0]} Pgs</div>
-              <div className="w-full bg-slate-800 h-1.5 rounded-full mt-1.5 overflow-hidden">
-                <div className="bg-red-500 h-full rounded-full" style={{ width: '85%' }} />
-              </div>
-            </div>
 
-            {/* Smart Microchip */}
-            <div className="w-4 h-5 rounded bg-amber-400 border border-amber-300 flex items-center justify-center flex-shrink-0 shadow-sm">
-              <Cpu size={10} className="text-slate-950" />
+              {/* Inner Details */}
+              <div className="flex-1 px-2.5 text-left">
+                <div className="flex items-center gap-1.5">
+                  <img src={heroImg} alt="OM" className="w-4 h-4 object-contain" />
+                  <span className="text-[10px] font-black text-white tracking-wide">OM LASER</span>
+                </div>
+                <div className="text-[9px] text-slate-300 font-mono mt-1">{product.sku || 'TONER'}</div>
+                <div className="w-full bg-slate-800 h-1.5 rounded-full mt-1.5 overflow-hidden">
+                  <div className="bg-red-500 h-full rounded-full" style={{ width: '85%' }} />
+                </div>
+              </div>
+
+              {/* Smart Microchip */}
+              <div className="w-4 h-5 rounded bg-amber-400 border border-amber-300 flex items-center justify-center flex-shrink-0 shadow-sm">
+                <Cpu size={10} className="text-slate-950" />
+              </div>
             </div>
           </div>
-        </div>
+        )}
 
       </div>
 
@@ -292,12 +256,13 @@ const EcommerceProductCard = ({ product, onQuickView, onAddToCart }) => {
           </div>
 
           <div className="grid grid-cols-2 gap-2">
-            <button
-              onClick={() => onQuickView(product)}
-              className="py-2 px-2.5 rounded-xl border border-slate-200 hover:border-slate-300 bg-slate-50 hover:bg-slate-100 text-slate-700 text-xs font-semibold transition text-center cursor-pointer"
+            <Link
+              to={`/products/${product._id || product.id}`}
+              className="py-2 px-2.5 rounded-xl border border-slate-200 hover:border-slate-300 bg-slate-50 hover:bg-slate-100 text-slate-700 text-xs font-semibold transition text-center cursor-pointer flex items-center justify-center gap-1"
             >
-              Details
-            </button>
+              <span>Details</span>
+              <ArrowRight size={12} />
+            </Link>
 
             <button
               onClick={() => onAddToCart(product)}
@@ -488,16 +453,32 @@ const LandingPage = () => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   // E-commerce Cart / Inquiry Drawer State
-  const [cartItems, setCartItems] = useState([
-    {
-      ...DEMO_PRODUCTS[0],
-      quantity: 2
-    }
-  ]);
+  const [cartItems, setCartItems] = useState([]);
   const [cartDrawerOpen, setCartDrawerOpen] = useState(false);
+
+  // Live Products State from Admin Inventory
+  const [products, setProducts] = useState([]);
+  const [loadingProducts, setLoadingProducts] = useState(true);
 
   // Product Filter State
   const [activeCategory, setActiveCategory] = useState('all');
+
+  useEffect(() => {
+    const fetchPublicProducts = async () => {
+      setLoadingProducts(true);
+      try {
+        const res = await api.get('/products/public');
+        if (res.data?.success && Array.isArray(res.data.data)) {
+          setProducts(res.data.data.map(formatPublicProduct));
+        }
+      } catch (err) {
+        console.error('Failed to load public products:', err);
+      } finally {
+        setLoadingProducts(false);
+      }
+    };
+    fetchPublicProducts();
+  }, []);
 
   // Quick View Modal
   const [selectedProduct, setSelectedProduct] = useState(null);
@@ -564,8 +545,12 @@ const LandingPage = () => {
 
   const filteredProducts =
     activeCategory === 'all'
-      ? DEMO_PRODUCTS
-      : DEMO_PRODUCTS.filter((p) => p.categorySlug === activeCategory);
+      ? products
+      : products.filter(
+          (p) =>
+            p.categorySlug === activeCategory ||
+            (p.unit && p.unit.toLowerCase() === activeCategory)
+        );
 
   const handleContactSubmit = (e) => {
     e.preventDefault();
@@ -899,17 +884,38 @@ const LandingPage = () => {
               </div>
             </div>
 
-            {/* 3D Products Grid */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-              {filteredProducts.map((product) => (
-                <EcommerceProductCard
-                  key={product.id}
-                  product={product}
-                  onQuickView={(p) => setSelectedProduct(p)}
-                  onAddToCart={handleAddToCart}
-                />
-              ))}
-            </div>
+            {/* Products Grid / Status */}
+            {loadingProducts ? (
+              <div className="py-20 text-center">
+                <div className="w-10 h-10 border-4 border-[#15527A] border-t-transparent rounded-full animate-spin mx-auto mb-3" />
+                <p className="text-sm font-semibold text-slate-600">Loading products from inventory...</p>
+              </div>
+            ) : filteredProducts.length === 0 ? (
+              <div className="py-16 text-center max-w-md mx-auto p-8 rounded-2xl bg-slate-50 border border-slate-200">
+                <Printer size={36} className="mx-auto text-slate-400 mb-2" />
+                <h3 className="text-base font-bold text-slate-800">No products currently displayed</h3>
+                <p className="text-xs text-slate-500 mt-1">
+                  Products will appear here once enabled with &quot;Display on Public Website&quot; in Admin Inventory.
+                </p>
+                <button
+                  onClick={() => scrollToSection('contact')}
+                  className="mt-4 px-4 py-2 rounded-xl bg-[#15527A] text-white text-xs font-bold"
+                >
+                  Contact For Inquiry
+                </button>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                {filteredProducts.map((product) => (
+                  <EcommerceProductCard
+                    key={product.id}
+                    product={product}
+                    onQuickView={(p) => setSelectedProduct(p)}
+                    onAddToCart={handleAddToCart}
+                  />
+                ))}
+              </div>
+            )}
 
             {/* Bulk Supply Banner */}
             <div className="mt-14 p-6 sm:p-8 rounded-2xl bg-gradient-to-r from-blue-50 via-slate-50 to-red-50 border border-slate-200 flex flex-col md:flex-row items-center justify-between gap-6">
@@ -1789,6 +1795,16 @@ const LandingPage = () => {
               </span>
             </div>
 
+            {selectedProduct.imageUrl && (
+              <div className="w-full h-44 bg-slate-50 rounded-xl border border-slate-200 mb-4 p-2 flex items-center justify-center overflow-hidden">
+                <img
+                  src={selectedProduct.imageUrl}
+                  alt={selectedProduct.name}
+                  className="max-h-full max-w-full object-contain"
+                />
+              </div>
+            )}
+
             <h3 className="text-2xl font-black text-slate-900">{selectedProduct.name}</h3>
 
             {/* Pricing */}
@@ -1843,6 +1859,14 @@ const LandingPage = () => {
               </button>
 
               <div className="flex items-center gap-2">
+                <Link
+                  to={`/products/${selectedProduct._id || selectedProduct.id}`}
+                  className="px-4 py-2.5 rounded-xl border border-[#15527A] text-[#15527A] hover:bg-blue-50 text-xs font-bold transition inline-flex items-center gap-1.5"
+                >
+                  <span>Full Details</span>
+                  <ExternalLink size={13} />
+                </Link>
+
                 <button
                   onClick={() => {
                     handleAddToCart(selectedProduct);

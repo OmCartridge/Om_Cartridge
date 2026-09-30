@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { Plus, Search, Edit2, Trash2, TrendingUp, BarChart3, X, Upload } from 'lucide-react';
 import AppLayout from '../layouts/AppLayout';
 import api from '../services/api';
@@ -19,6 +19,7 @@ const StockStatusBadge = ({ qty, minStock }) => {
 const defaultProduct = {
   name: '', sku: '', hsnSac: '', description: '', quantity: 0, unit: 'PCS',
   purchaseRate: 0, sellingRate: 0, gstRate: 18, minimumStock: 5, isActive: true,
+  imageUrl: '', displayOnWebsite: false,
 };
 
 const StockPage = () => {
@@ -31,6 +32,8 @@ const StockPage = () => {
   const [form, setForm] = useState(defaultProduct);
   const [adjustForm, setAdjustForm] = useState({ productId: '', adjustment: '', reason: 'New Purchase' });
   const [saving, setSaving] = useState(false);
+  const fileInputRef = useRef(null);
+  const [uploadingImage, setUploadingImage] = useState(false);
 
   // Confirm delete modal
   const [confirmDelete, setConfirmDelete] = useState(null);
@@ -50,8 +53,67 @@ const StockPage = () => {
   useEffect(() => { fetchProducts(); }, [search]);
 
   const openAdd = () => { setForm(defaultProduct); setEditProduct(null); setShowProductModal(true); };
-  const openEdit = (p) => { setForm({ ...p }); setEditProduct(p); setShowProductModal(true); };
+  const openEdit = (p) => {
+    setForm({
+      ...p,
+      imageUrl: p.imageUrl || '',
+      displayOnWebsite: !!p.displayOnWebsite,
+    });
+    setEditProduct(p);
+    setShowProductModal(true);
+  };
   const openAdjust = (p) => { setAdjustForm({ productId: p._id, adjustment: '', reason: 'New Purchase' }); setShowAdjustModal(true); };
+
+  const handleImageFileChange = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Reset input value so same file can be selected again
+    e.target.value = '';
+
+    // Validate format: JPG, JPEG, PNG, WEBP
+    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+    const lowerName = file.name.toLowerCase();
+    const hasValidExt =
+      lowerName.endsWith('.jpg') ||
+      lowerName.endsWith('.jpeg') ||
+      lowerName.endsWith('.png') ||
+      lowerName.endsWith('.webp');
+
+    if (!allowedTypes.includes(file.type) && !hasValidExt) {
+      toast.error('Invalid image format.');
+      return;
+    }
+
+    // Validate size: 5MB
+    const maxSize = 5 * 1024 * 1024;
+    if (file.size > maxSize) {
+      toast.error('Image size is too large.');
+      return;
+    }
+
+    setUploadingImage(true);
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const result = event.target?.result;
+      if (typeof result === 'string') {
+        setForm((prev) => ({ ...prev, imageUrl: result }));
+        toast.success('Product photograph loaded');
+      } else {
+        toast.error('Unable to upload image.');
+      }
+      setUploadingImage(false);
+    };
+    reader.onerror = () => {
+      toast.error('Unable to upload image.');
+      setUploadingImage(false);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleRemoveImage = () => {
+    setForm((prev) => ({ ...prev, imageUrl: '' }));
+  };
 
   const handleSaveProduct = async (e) => {
     e.preventDefault();
@@ -176,8 +238,29 @@ const StockPage = () => {
                 {products.map((p) => (
                   <tr key={p._id}>
                     <td>
-                      <div className="font-semibold text-gray-900">{p.name}</div>
-                      {p.description && <div className="text-[11.5px] text-gray-500 mt-0.5">{p.description}</div>}
+                      <div className="flex items-center gap-2.5">
+                        {p.imageUrl ? (
+                          <img
+                            src={p.imageUrl}
+                            alt={p.name}
+                            className="w-9 h-9 rounded-lg object-contain bg-slate-50 border border-gray-200 flex-shrink-0"
+                          />
+                        ) : null}
+                        <div>
+                          <div className="flex items-center gap-1.5">
+                            <span className="font-semibold text-gray-900">{p.name}</span>
+                            {p.displayOnWebsite && (
+                              <span
+                                className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-blue-50 text-[#15527A] border border-blue-200"
+                                title="Visible on public website"
+                              >
+                                Web ON
+                              </span>
+                            )}
+                          </div>
+                          {p.description && <div className="text-[11.5px] text-gray-500 mt-0.5">{p.description}</div>}
+                        </div>
+                      </div>
                     </td>
                     <td>
                       <code className="text-xs bg-gray-100 px-2 py-0.5 rounded font-mono text-gray-700">
@@ -377,7 +460,7 @@ const StockPage = () => {
                 </div>
               </div>
 
-              <div className="pt-1">
+              <div className="pt-1 flex items-center justify-between gap-4 flex-wrap">
                 <label className="inline-flex items-center gap-2 cursor-pointer">
                   <input
                     type="checkbox"
@@ -387,6 +470,110 @@ const StockPage = () => {
                   />
                   <span className="text-xs font-semibold text-gray-700">Active Product</span>
                 </label>
+              </div>
+
+              {/* Product Photograph Section */}
+              <div className="form-group mb-0 border-t border-app-border pt-4">
+                <label className="form-label mb-2 block font-semibold text-gray-800 text-xs">
+                  Product Photograph
+                </label>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp"
+                  className="hidden"
+                  onChange={handleImageFileChange}
+                />
+
+                {form.imageUrl ? (
+                  <div className="flex items-center gap-4 p-3 bg-slate-50 border border-slate-200 rounded-xl">
+                    <div className="w-20 h-20 rounded-lg overflow-hidden border border-slate-300 bg-white flex items-center justify-center flex-shrink-0">
+                      <img
+                        src={form.imageUrl}
+                        alt="Product photograph preview"
+                        className="w-full h-full object-contain p-1"
+                      />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-semibold text-gray-800">Photograph Attached</p>
+                      <p className="text-[11px] text-gray-500 mt-0.5">JPG, PNG, or WEBP (Max 5MB)</p>
+                      <div className="flex items-center gap-2 mt-2">
+                        <button
+                          type="button"
+                          className="btn btn-outline btn-sm py-1 px-2.5 text-xs"
+                          onClick={() => fileInputRef.current?.click()}
+                          disabled={uploadingImage}
+                        >
+                          Replace Image
+                        </button>
+                        <button
+                          type="button"
+                          className="btn btn-danger btn-sm py-1 px-2.5 text-xs text-red-600 bg-red-50 hover:bg-red-100 border border-red-200"
+                          onClick={handleRemoveImage}
+                          disabled={uploadingImage}
+                        >
+                          Remove Image
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div
+                    onClick={() => fileInputRef.current?.click()}
+                    className="border-2 border-dashed border-gray-300 hover:border-[#15527A] rounded-xl p-4 text-center cursor-pointer transition-colors bg-slate-50/50 hover:bg-slate-50 flex flex-col items-center justify-center gap-1.5"
+                  >
+                    <div className="w-9 h-9 rounded-full bg-blue-50 border border-blue-200 flex items-center justify-center text-[#15527A]">
+                      <Upload size={16} />
+                    </div>
+                    <div>
+                      <span className="btn btn-outline btn-sm font-semibold text-xs text-[#15527A] pointer-events-none">
+                        [ Choose Image ]
+                      </span>
+                      <div className="text-[11px] text-gray-500 mt-1">
+                        Supported formats: JPG, JPEG, PNG, WEBP (Max 5MB)
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Display on Public Website Option */}
+              <div className="p-3.5 rounded-xl border border-app-border bg-slate-50 flex items-center justify-between gap-4">
+                <div>
+                  <div className="text-xs font-bold text-gray-900">
+                    Display on Public Website
+                  </div>
+                  <div className="text-[11px] text-gray-500 mt-0.5">
+                    {form.displayOnWebsite
+                      ? 'Product will be visible to customers on the public website catalog.'
+                      : 'Product remains in inventory but is hidden from the public website.'}
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-1 bg-white border border-gray-300 rounded-lg p-1 flex-shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => setForm({ ...form, displayOnWebsite: true })}
+                    className={`px-3 py-1 text-xs font-bold rounded-md transition-all cursor-pointer ${
+                      form.displayOnWebsite
+                        ? 'bg-emerald-600 text-white shadow-sm'
+                        : 'text-gray-500 hover:text-gray-800'
+                    }`}
+                  >
+                    ON
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setForm({ ...form, displayOnWebsite: false })}
+                    className={`px-3 py-1 text-xs font-bold rounded-md transition-all cursor-pointer ${
+                      !form.displayOnWebsite
+                        ? 'bg-gray-600 text-white shadow-sm'
+                        : 'text-gray-500 hover:text-gray-800'
+                    }`}
+                  >
+                    OFF
+                  </button>
+                </div>
               </div>
 
               <div className="flex gap-2.5 justify-end pt-4 border-t border-app-border">

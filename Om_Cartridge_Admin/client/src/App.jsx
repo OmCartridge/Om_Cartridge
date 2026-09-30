@@ -10,6 +10,8 @@ import CreateInvoicePage from './pages/CreateInvoicePage';
 import InvoicesPage from './pages/InvoicesPage';
 import InvoiceViewPage from './pages/InvoiceViewPage';
 import SettingsPage from './pages/SettingsPage';
+import PublicProductsPage from './pages/PublicProductsPage';
+import PublicProductDetailsPage from './pages/PublicProductDetailsPage';
 
 // Protected Route wrapper
 const ProtectedRoute = ({ children }) => {
@@ -38,6 +40,9 @@ function AppRoutes() {
   return (
     <Routes>
       <Route path="/" element={<LandingPage />} />
+      <Route path="/products" element={<PublicProductsPage />} />
+      <Route path="/products/:id" element={<PublicProductDetailsPage />} />
+      <Route path="/product/:id" element={<PublicProductDetailsPage />} />
       <Route path="/login" element={<PublicRoute><LoginPage /></PublicRoute>} />
       <Route path="/dashboard" element={<ProtectedRoute><DashboardPage /></ProtectedRoute>} />
       <Route path="/stock" element={<ProtectedRoute><StockPage /></ProtectedRoute>} />
